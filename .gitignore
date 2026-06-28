@@ -1,0 +1,13 @@
+# Swift / SwiftPM
+.build/
+.swiftpm/
+*.xcodeproj
+DerivedData/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Python (dev oracle)
+__pycache__/
+*.pyc
