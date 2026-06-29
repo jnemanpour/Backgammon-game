@@ -158,18 +158,38 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
 .bar .checker, .tray .checker { width: 70%; max-width: 22px; }
 .tray .count { color: var(--muted); font-size: 11px; padding: 2px; }
 
-/* highlights */
+.bar, .tray { position: relative; }
+
+/* movable checkers: subtle blue outline; selected source: white outline */
 .point.src::after, .bar.src::after { content: ""; position: absolute; inset: 0;
   border: 3px solid var(--hi-src); border-radius: 6px; z-index: 4; pointer-events: none;
   animation: pulseGlow 1.1s ease-in-out infinite; }
-.point.dst::after, .tray.dst::after { content: ""; position: absolute; inset: 0;
-  border: 3px solid var(--hi-dst); border-radius: 6px; z-index: 4; pointer-events: none;
-  animation: pulseGlow 1.1s ease-in-out infinite; }
 .point.sel::after { content: ""; position: absolute; inset: 0; border: 3px solid #fff;
   border-radius: 6px; z-index: 5; pointer-events: none; }
-.bar, .tray { position: relative; }
-.bestghost { outline: 3px dashed #ffb300; outline-offset: -3px; transition: outline-color .2s; }
 @keyframes pulseGlow { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+
+/* Landing spots: the triangle itself glow-pulses. Yellow = a legal place the
+   selected checker can land; green = a teaching-mode recommended spot (green
+   wins when a spot is both). The overlay is clipped to the triangle shape. */
+.point.dst::after, .point.bestghost::after { content: ""; position: absolute;
+  left: 8%; right: 8%; z-index: 2; pointer-events: none; }
+.board-half.top .point.dst::after, .board-half.top .point.bestghost::after {
+  top: 0; height: 92%; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.board-half.bottom .point.dst::after, .board-half.bottom .point.bestghost::after {
+  bottom: 0; height: 92%; clip-path: polygon(50% 0, 0 100%, 100% 100%); }
+.point.dst::after       { background: rgba(255,212,60,.45); animation: glowYellow 1s ease-in-out infinite; }
+.point.bestghost::after { background: rgba(70,222,110,.5);  animation: glowGreen  1s ease-in-out infinite; }
+.tray.dst { animation: glowYellowBox 1s ease-in-out infinite; }
+
+@keyframes glowYellow {
+  0%,100% { opacity: .5; filter: drop-shadow(0 0 2px rgba(255,205,50,.7)); }
+  50%     { opacity: 1;  filter: drop-shadow(0 0 10px rgba(255,205,50,1)); } }
+@keyframes glowGreen {
+  0%,100% { opacity: .5; filter: drop-shadow(0 0 2px rgba(55,215,100,.7)); }
+  50%     { opacity: 1;  filter: drop-shadow(0 0 10px rgba(55,215,100,1)); } }
+@keyframes glowYellowBox {
+  0%,100% { box-shadow: inset 0 0 0 2px rgba(255,205,50,.5), 0 0 4px rgba(255,205,50,.4); }
+  50%     { box-shadow: inset 0 0 0 3px rgba(255,205,50,1), 0 0 12px rgba(255,205,50,.9); } }
 
 /* a checker mid-flight between points */
 .checker.flying { position: fixed; z-index: 100; pointer-events: none; margin: 0;
