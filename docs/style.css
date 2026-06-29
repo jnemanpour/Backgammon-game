@@ -18,8 +18,12 @@
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-#app { max-width: 540px; margin: 0 auto; padding: 8px 8px 24px; }
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  height: 100%; overflow: hidden; }
+#app { max-width: 540px; margin: 0 auto; padding: 6px 8px;
+  height: 100vh; height: 100dvh; display: flex; flex-direction: column; gap: 5px; }
+/* fixed-height rows; the board flexes to fill what's left */
+.topbar, .status, .diceRow, .controls, .teachPanel, .stats { flex: 0 0 auto; }
 
 .topbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .topbar h1 { font-size: 18px; margin: 0; flex: 1; font-weight: 700; }
@@ -34,8 +38,8 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
 .status .pips { color: var(--muted); white-space: nowrap; }
 
 /* Board */
-#board { background: var(--wood); border: 8px solid var(--wood); border-radius: 10px;
-  margin: 8px 0; display: flex; flex-direction: column; height: 58vh; min-height: 380px; max-height: 620px; }
+#board { background: var(--wood); border: 6px solid var(--wood); border-radius: 10px;
+  margin: 2px 0; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .board-half { display: flex; flex: 1; min-height: 0; }
 .quadrant { display: flex; flex: 12; background: var(--felt); min-width: 0; }
 .bar { flex: 1.4; background: var(--wood-light); display: flex; flex-direction: column;
@@ -49,9 +53,9 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
 .board-half.bottom .point { justify-content: flex-end; }
 /* triangles */
 .point::before { content: ""; position: absolute; left: 8%; right: 8%; }
-.board-half.top .point::before { top: 0; height: 70%;
+.board-half.top .point::before { top: 0; height: 90%;
   clip-path: polygon(0 0, 100% 0, 50% 100%); }
-.board-half.bottom .point::before { bottom: 0; height: 70%;
+.board-half.bottom .point::before { bottom: 0; height: 90%;
   clip-path: polygon(50% 0, 0 100%, 100% 100%); }
 .point:nth-child(odd)::before { background: var(--pt-dark); }
 .point:nth-child(even)::before { background: var(--pt-light); }
@@ -96,7 +100,8 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
 @keyframes landPop { 0% { transform: scale(1.28); } 100% { transform: scale(1); } }
 
 /* Dice + cube row */
-.diceRow { display: flex; align-items: center; gap: 10px; justify-content: center; margin: 6px 0; min-height: 46px; }
+.diceRow { display: flex; align-items: center; gap: 14px; justify-content: center; margin: 2px 0; min-height: 46px; }
+#dice { display: flex; align-items: center; gap: 8px; }
 .die { width: 42px; height: 42px; background: #f4efe2; border-radius: 8px; display: grid;
   grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 5px; box-shadow: 0 2px 4px rgba(0,0,0,.4);
   transition: opacity .2s, transform .2s; }
