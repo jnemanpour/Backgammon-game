@@ -6,10 +6,53 @@ A native iOS backgammon app with Easy/Medium/Hard/Expert opponents and a
 
 ## Status
 
-This repo currently contains **Module 1 — the core model & rules engine**
-(roadmap step 1 of the build spec). It is a UI-free Swift package, built and
-tested in isolation as the correctness-critical foundation everything else
-(AI, Teach Me) depends on.
+Two things live here:
+
+1. **`Sources/BackgammonEngine` — the native Swift rules engine** (roadmap step 1):
+   the UI-free, correctness-critical foundation, with its XCTest suite.
+2. **`web/` — a complete, playable web version** that reuses the same engine
+   logic (ported to JS) and adds the four AI difficulties, the doubling cube,
+   **Teach Me** mode, a touch UI, and save/resume. This is the part you can
+   **play on a phone today** — no Mac, Xcode, or App Store needed — and it
+   ports directly to the native SwiftUI/SpriteKit app later.
+
+> A native iOS `.ipa` can't be built in a Linux/CI environment; it needs macOS
+> + Xcode (and TestFlight to reach a device). The web build is the runnable
+> product in the meantime, behind the identical engine/AI/Teach architecture.
+
+## Play it (web)
+
+- **On your phone, instantly:** open `web/play.html` — a single self-contained
+  file (all CSS/JS inlined). Easiest is via GitHub Pages (below) or by opening
+  the file directly in any browser.
+- **Locally:** `cd web && python3 -m http.server` then open
+  `http://localhost:8000/` (uses the modular files), or just open
+  `web/play.html` directly.
+- **GitHub Pages (clean URL):** repo **Settings → Pages → Source: Deploy from a
+  branch → `/web` folder**, then visit the published URL. (Rebuild the single
+  file after editing any `web/*.js`: `python3 web/build_play.py`.)
+
+Pick a difficulty (Easy/Medium/Hard/Expert), toggle **Teach** for best-move
+hints and verdicts, and use the cube to double. You play White (bottom-right
+home): tap a checker, then its destination.
+
+### How the web app is structured
+```
+web/
+  engine.js     rules engine — parity port of the Swift core (engine.test.js)
+  ai.js         positional evaluator, 4 difficulties, 1-ply search, cube logic
+  teach.js      Teach Me: best move, verdict, "why" reasons, exact shot counts
+  ui.js         touch board, dice, cube, Teach overlay, turn flow, persistence
+  style.css     mobile-first board styling
+  index.html    modular entry (loads the files above)
+  play.html     generated single-file build (build_play.py) — open this on phone
+```
+Run the JS engine's parity/property tests with `node web/engine.test.js`.
+
+## Native engine (Swift)
+
+`Sources/BackgammonEngine` is the UI-free Swift package — the foundation the
+native app will build on.
 
 ```
 Sources/BackgammonEngine/

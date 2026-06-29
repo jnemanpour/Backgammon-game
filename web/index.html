@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#14181d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Backgammon</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="topbar">
+      <h1>Backgammon</h1>
+      <select id="levelSel" title="Difficulty">
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+        <option value="expert">Expert</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="teachChk" /> Teach</label>
+      <select id="tierSel" title="Explanation level">
+        <option value="beginner">Beginner</option>
+        <option value="intermediate">Intermediate</option>
+        <option value="advanced">Advanced</option>
+      </select>
+    </div>
+
+    <div class="status">
+      <span class="msg" id="msg"></span>
+      <span class="pips" id="pips"></span>
+    </div>
+
+    <div id="board">
+      <div class="board-half top">
+        <div class="quadrant" id="q-tl"></div>
+        <div class="bar" id="bar-top"></div>
+        <div class="quadrant" id="q-tr"></div>
+        <div class="tray" id="tray-top"><span class="count">✓ 0</span></div>
+      </div>
+      <div class="board-half bottom">
+        <div class="quadrant" id="q-bl"></div>
+        <div class="bar" id="bar-bottom"></div>
+        <div class="quadrant" id="q-br"></div>
+        <div class="tray" id="tray-bottom"><span class="count">✓ 0</span></div>
+      </div>
+    </div>
+
+    <div class="diceRow">
+      <div id="cube" class="cube">1</div>
+      <div id="dice"></div>
+    </div>
+
+    <div class="controls">
+      <button id="rollBtn" class="primary">Roll</button>
+      <button id="undoBtn">Undo</button>
+      <button id="doubleBtn">Double</button>
+      <button id="newBtn">New Game</button>
+    </div>
+
+    <div class="teachPanel" id="teachPanel" style="display:none">
+      <div class="verdict"></div>
+      <div class="why"></div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+    <div class="stats">You are White (bottom-right home). Tap a checker, then its destination.</div>
+  </div>
+
+  <script src="engine.js"></script>
+  <script src="ai.js"></script>
+  <script src="teach.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
