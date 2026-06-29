@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#14181d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Backgammon</title>
+  <!-- self-contained build; edit web/*.js and rerun build_play.py -->
+  <style>
+:root {
+  --felt: #0f5132;
+  --felt-dark: #0b3d26;
+  --wood: #6b4226;
+  --wood-light: #8a5a36;
+  --pt-light: #d9b38c;
+  --pt-dark: #a9744f;
+  --white-checker: #f4efe2;
+  --white-edge: #b9b09a;
+  --black-checker: #2b2b2b;
+  --black-edge: #000;
+  --hi-src: #ffd54a;
+  --hi-dst: #4ad6ff;
+  --bg: #14181d;
+  --panel: #1d242b;
+  --text: #e8edf2;
+  --muted: #9fb0bd;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+#app { max-width: 540px; margin: 0 auto; padding: 8px 8px 24px; }
+
+.topbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.topbar h1 { font-size: 18px; margin: 0; flex: 1; font-weight: 700; }
+.topbar select, .topbar button, .controls button {
+  background: var(--panel); color: var(--text); border: 1px solid #2f3a44;
+  border-radius: 8px; padding: 7px 10px; font-size: 14px; }
+.toggle { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--muted); }
+
+.status { background: var(--panel); border-radius: 8px; padding: 6px 10px; font-size: 13px;
+  min-height: 20px; display: flex; justify-content: space-between; gap: 8px; }
+.status .msg { color: var(--text); }
+.status .pips { color: var(--muted); white-space: nowrap; }
+
+/* Board */
+#board { background: var(--wood); border: 8px solid var(--wood); border-radius: 10px;
+  margin: 8px 0; display: flex; flex-direction: column; height: 58vh; min-height: 380px; max-height: 620px; }
+.board-half { display: flex; flex: 1; min-height: 0; }
+.quadrant { display: flex; flex: 12; background: var(--felt); min-width: 0; }
+.bar { flex: 1.4; background: var(--wood-light); display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between; min-width: 22px; }
+.tray { flex: 1.6; background: var(--felt-dark); display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between; border-left: 3px solid var(--wood); min-width: 26px; }
+
+.point { flex: 1; position: relative; display: flex; flex-direction: column;
+  align-items: center; min-width: 0; cursor: pointer; }
+.board-half.top .point { justify-content: flex-start; }
+.board-half.bottom .point { justify-content: flex-end; }
+/* triangles */
+.point::before { content: ""; position: absolute; left: 8%; right: 8%; }
+.board-half.top .point::before { top: 0; height: 70%;
+  clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.board-half.bottom .point::before { bottom: 0; height: 70%;
+  clip-path: polygon(50% 0, 0 100%, 100% 100%); }
+.point:nth-child(odd)::before { background: var(--pt-dark); }
+.point:nth-child(even)::before { background: var(--pt-light); }
+
+.point .label { position: absolute; font-size: 9px; color: rgba(255,255,255,.5); z-index: 2; }
+.board-half.top .point .label { bottom: 2px; }
+.board-half.bottom .point .label { top: 2px; }
+
+.checkers { position: relative; z-index: 3; display: flex; flex-direction: column;
+  align-items: center; width: 100%; }
+.board-half.bottom .checkers { flex-direction: column-reverse; }
+.checker { width: 84%; max-width: 30px; aspect-ratio: 1; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
+  margin: -1px 0; box-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.checker.w { background: radial-gradient(circle at 35% 30%, #fff, var(--white-checker));
+  border: 1.5px solid var(--white-edge); color: #333; }
+.checker.b { background: radial-gradient(circle at 35% 30%, #555, var(--black-checker));
+  border: 1.5px solid var(--black-edge); color: #eee; }
+
+/* stacked checkers in bar/tray are smaller */
+.bar .checker, .tray .checker { width: 70%; max-width: 22px; }
+.tray .count { color: var(--muted); font-size: 11px; padding: 2px; }
+
+/* highlights */
+.point.src::after, .bar.src::after { content: ""; position: absolute; inset: 0;
+  border: 3px solid var(--hi-src); border-radius: 6px; z-index: 4; pointer-events: none; }
+.point.dst::after, .tray.dst::after { content: ""; position: absolute; inset: 0;
+  border: 3px solid var(--hi-dst); border-radius: 6px; z-index: 4; pointer-events: none; }
+.point.sel::after { content: ""; position: absolute; inset: 0; border: 3px solid #fff;
+  border-radius: 6px; z-index: 5; pointer-events: none; }
+.bar, .tray { position: relative; }
+.bestghost { outline: 3px dashed #7CFC9A; outline-offset: -3px; }
+
+/* Dice + cube row */
+.diceRow { display: flex; align-items: center; gap: 10px; justify-content: center; margin: 6px 0; min-height: 46px; }
+.die { width: 42px; height: 42px; background: #f4efe2; border-radius: 8px; display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 5px; box-shadow: 0 2px 4px rgba(0,0,0,.4); }
+.die.used { opacity: .35; }
+.die .pip { width: 7px; height: 7px; border-radius: 50%; background: #222; align-self: center; justify-self: center; }
+.cube { width: 40px; height: 40px; border: 2px solid #cfd8dc; border-radius: 8px; background: #11161b;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; }
+.cube small { font-size: 9px; color: var(--muted); position: absolute; margin-top: 28px; }
+
+.controls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
+.controls button { flex: 1; min-width: 92px; font-weight: 600; }
+.controls button.primary { background: #1c7c4a; border-color: #1c7c4a; }
+.controls button:disabled { opacity: .4; }
+
+.teachPanel { background: var(--panel); border-radius: 8px; padding: 10px; margin-top: 8px; font-size: 13px; line-height: 1.4; }
+.teachPanel .verdict { font-weight: 700; margin-bottom: 4px; }
+.teachPanel .verdict.best { color: #7CFC9A; }
+.teachPanel .verdict.good { color: #a3e635; }
+.teachPanel .verdict.doubtful { color: #fbbf24; }
+.teachPanel .verdict.error { color: #fb923c; }
+.teachPanel .verdict.blunder { color: #f87171; }
+.teachPanel button { margin-top: 6px; background: #2a3a47; color: var(--text); border: 1px solid #2f3a44; border-radius: 8px; padding: 6px 10px; }
+
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex;
+  align-items: center; justify-content: center; z-index: 50; }
+.modal .card { background: var(--panel); border-radius: 12px; padding: 18px; max-width: 320px; text-align: center; }
+.modal .card h2 { margin: 0 0 8px; }
+.modal .card .row { display: flex; gap: 8px; margin-top: 12px; }
+.modal .card .row button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-weight: 700; }
+.stats { font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
+
+</style>
+</head>
+<body>
+  <div id="app">
+    <div class="topbar">
+      <h1>Backgammon</h1>
+      <select id="levelSel" title="Difficulty">
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+        <option value="expert">Expert</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="teachChk" /> Teach</label>
+      <select id="tierSel" title="Explanation level">
+        <option value="beginner">Beginner</option>
+        <option value="intermediate">Intermediate</option>
+        <option value="advanced">Advanced</option>
+      </select>
+    </div>
+
+    <div class="status">
+      <span class="msg" id="msg"></span>
+      <span class="pips" id="pips"></span>
+    </div>
+
+    <div id="board">
+      <div class="board-half top">
+        <div class="quadrant" id="q-tl"></div>
+        <div class="bar" id="bar-top"></div>
+        <div class="quadrant" id="q-tr"></div>
+        <div class="tray" id="tray-top"><span class="count">✓ 0</span></div>
+      </div>
+      <div class="board-half bottom">
+        <div class="quadrant" id="q-bl"></div>
+        <div class="bar" id="bar-bottom"></div>
+        <div class="quadrant" id="q-br"></div>
+        <div class="tray" id="tray-bottom"><span class="count">✓ 0</span></div>
+      </div>
+    </div>
+
+    <div class="diceRow">
+      <div id="cube" class="cube">1</div>
+      <div id="dice"></div>
+    </div>
+
+    <div class="controls">
+      <button id="rollBtn" class="primary">Roll</button>
+      <button id="undoBtn">Undo</button>
+      <button id="doubleBtn">Double</button>
+      <button id="newBtn">New Game</button>
+    </div>
+
+    <div class="teachPanel" id="teachPanel" style="display:none">
+      <div class="verdict"></div>
+      <div class="why"></div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+    <div class="stats">You are White (bottom-right home). Tap a checker, then its destination.</div>
+  </div>
+
+  <script>
+// engine.js — backgammon rules engine (browser + Node).
+// A faithful port of Sources/BackgammonEngine (validated by dev/oracle).
+//
+// Conventions: points[1..24] from White's view, index 0 unused.
+//   +n = n White checkers, -n = n Black checkers. White (= +1) moves high->low
+//   and bears off past 1; Black (= -1) mirrors. All generation runs on a
+//   normalized board (mover positive) and is de-normalized on the way out.
+(function (root, factory) {
+  const mod = factory();
+  if (typeof module === "object" && module.exports) module.exports = mod;
+  else root.Engine = mod;
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  const WHITE = 1, BLACK = -1;
+
+  function startingBoard() {
+    const pts = new Array(25).fill(0);
+    const setup = { 1: -2, 6: 5, 8: 3, 12: -5, 13: 5, 17: -3, 19: -5, 24: 2 };
+    for (const k in setup) pts[+k] = setup[k];
+    return { points: pts, barW: 0, barB: 0, offW: 0, offB: 0 };
+  }
+
+  const clone = (b) => ({ points: b.points.slice(), barW: b.barW, barB: b.barB, offW: b.offW, offB: b.offB });
+  const bar = (b, pl) => (pl === WHITE ? b.barW : b.barB);
+  const off = (b, pl) => (pl === WHITE ? b.offW : b.offB);
+  const owns = (b, p, pl) => (pl === WHITE ? b.points[p] > 0 : b.points[p] < 0);
+  const count = (b, p, pl) => { const v = b.points[p]; return pl === WHITE ? (v > 0 ? v : 0) : (v < 0 ? -v : 0); };
+
+  function checkerCount(b, pl) {
+    let c = bar(b, pl) + off(b, pl);
+    for (let p = 1; p <= 24; p++) c += count(b, p, pl);
+    return c;
+  }
+
+  function mirrored(b) {
+    const np = new Array(25).fill(0);
+    for (let p = 1; p <= 24; p++) np[p] = -b.points[25 - p];
+    return { points: np, barW: b.barB, barB: b.barW, offW: b.offB, offB: b.offW };
+  }
+  const normalized = (b, pl) => (pl === WHITE ? b : mirrored(b));
+
+  function winner(b) { if (b.offW === 15) return WHITE; if (b.offB === 15) return BLACK; return null; }
+
+  function winType(b) {
+    const w = winner(b);
+    if (w === null) return null;
+    const loser = -w;
+    if (off(b, loser) > 0) return "single";
+    if (bar(b, loser) > 0) return "backgammon";
+    const home = w === WHITE ? [1, 6] : [19, 24];
+    for (let p = home[0]; p <= home[1]; p++) if (owns(b, p, loser)) return "backgammon";
+    return "gammon";
+  }
+
+  function pipCount(b, pl) {
+    let pips = bar(b, pl) * 25;
+    for (let p = 1; p <= 24; p++) if (owns(b, p, pl)) {
+      const dist = pl === WHITE ? p : 25 - p;
+      pips += count(b, p, pl) * dist;
+    }
+    return pips;
+  }
+
+  // --- normalized helpers (mover positive) ---
+  const canLand = (b, p) => b.points[p] >= -1;
+  function allHome(b) {
+    if (b.barW > 0) return false;
+    for (let p = 7; p <= 24; p++) if (b.points[p] > 0) return false;
+    return true;
+  }
+  function noneHigher(b, p) {
+    if (p >= 6) return true;
+    for (let q = p + 1; q <= 6; q++) if (b.points[q] > 0) return false;
+    return true;
+  }
+
+  function singleStepMoves(b, die) {
+    const moves = [];
+    if (b.barW > 0) {
+      const entry = 25 - die;
+      if (canLand(b, entry)) moves.push({ from: 25, to: entry, die });
+      return moves;
+    }
+    for (let p = 24; p >= 1; p--) if (b.points[p] > 0) {
+      const dest = p - die;
+      if (dest >= 1 && canLand(b, dest)) moves.push({ from: p, to: dest, die });
+    }
+    if (allHome(b)) {
+      for (let p = 1; p <= 6; p++) if (b.points[p] > 0) {
+        if (p === die) moves.push({ from: p, to: 0, die });
+        else if (die > p && noneHigher(b, p)) moves.push({ from: p, to: 0, die });
+      }
+    }
+    return moves;
+  }
+
+  // Apply a single move on a NORMALIZED board (mover positive).
+  function applyNorm(m, b) {
+    const nb = clone(b);
+    if (m.from === 25) nb.barW--; else nb.points[m.from]--;
+    if (m.to === 0) nb.offW++;
+    else {
+      if (nb.points[m.to] < 0) { nb.points[m.to] = 0; nb.barB++; }
+      nb.points[m.to]++;
+    }
+    return nb;
+  }
+
+  // Apply a single move on a REAL board for `pl` (used by UI/AI step-by-step).
+  function applyMove(b, m, pl) {
+    const nb = clone(b);
+    if (m.from === 25) { if (pl === WHITE) nb.barW--; else nb.barB--; }
+    else nb.points[m.from] -= pl;
+    if (m.to === 0) { if (pl === WHITE) nb.offW++; else nb.offB++; }
+    else {
+      if (nb.points[m.to] === -pl) { nb.points[m.to] = 0; if (pl === WHITE) nb.barB++; else nb.barW++; }
+      nb.points[m.to] += pl;
+    }
+    return nb;
+  }
+
+  const keyB = (b) => b.points.join(",") + "|" + b.barW + "," + b.barB + "|" + b.offW + "," + b.offB;
+
+  function explore(b, remaining, acc, out, state) {
+    if (acc.length > state.max) state.max = acc.length;
+    if (acc.length > 0) {
+      const k = acc.map((m) => m.from + ">" + m.to + ":" + m.die).join(";") + "#" + keyB(b);
+      out.set(k, { moves: acc.slice(), result: b });
+    }
+    if (remaining.length === 0) return;
+    const die = remaining[0], rest = remaining.slice(1);
+    for (const mv of singleStepMoves(b, die)) explore(applyNorm(mv, b), rest, acc.concat([mv]), out, state);
+  }
+
+  const flip = (x) => (x === 0 || x === 25 ? x : 25 - x);
+  function denorm(play, pl) {
+    if (pl === WHITE) return play;
+    const moves = play.moves.map((m) => ({ from: flip(m.from), to: flip(m.to), die: m.die }));
+    return { moves, result: normalized(play.result, pl) };
+  }
+
+  function legalPlays(b, d1, d2, pl) {
+    const norm = normalized(b, pl);
+    const isDouble = d1 === d2;
+    const orderings = isDouble ? [[d1, d1, d1, d1]] : [[d1, d2], [d2, d1]];
+    const out = new Map();
+    const state = { max: 0 };
+    for (const seq of orderings) explore(norm, seq, [], out, state);
+    let best = [...out.values()].filter((p) => p.moves.length === state.max);
+    if (state.max === 1 && !isDouble) {
+      const larger = Math.max(d1, d2);
+      const wl = best.filter((p) => p.moves[0].die === larger);
+      if (wl.length) best = wl;
+    }
+    if (best.length === 0) best = [{ moves: [], result: norm }];
+    return best.map((p) => denorm(p, pl));
+  }
+
+  // Distinct legal plays by *resulting board* (collapses the many move orders
+  // that reach the same position — essential for fast search on doubles).
+  function uniquePlays(b, d1, d2, pl) {
+    const all = legalPlays(b, d1, d2, pl);
+    const seen = new Map();
+    for (const p of all) { const k = keyB(p.result); if (!seen.has(k)) seen.set(k, p); }
+    return [...seen.values()];
+  }
+
+  // All 21 distinct rolls with their /36 weight.
+  const allRolls = (() => {
+    const r = [];
+    for (let a = 1; a <= 6; a++) for (let b = a; b <= 6; b++) r.push({ d1: a, d2: b, prob: a === b ? 1 : 2 });
+    return r;
+  })();
+
+  return {
+    WHITE, BLACK,
+    startingBoard, clone, bar, off, owns, count, checkerCount,
+    mirrored, normalized, winner, winType, pipCount,
+    singleStepMoves, applyNorm, applyMove, legalPlays, uniquePlays, keyB, allRolls,
+  };
+});
+
+</script>
+  <script>
+// ai.js — opponent brain and the analysis used by Teach Me.
+//
+// Honest note: this is a hand-crafted *positional* evaluator, not Tesauro's
+// pubeval (whose exact weight vectors aren't reproduced here) nor a trained
+// neural net. It plays a reasonable game and, crucially, ranks every legal
+// play by an equity-like score — which is exactly what Teach Me needs. The
+// native app would swap this for pubeval / a TD-Gammon net behind the same API.
+(function (root, factory) {
+  const mod = factory(typeof require === "function" ? require("./engine.js") : root.Engine);
+  if (typeof module === "object" && module.exports) module.exports = mod;
+  else root.AI = mod;
+})(typeof self !== "undefined" ? self : this, function (E) {
+  "use strict";
+  const { WHITE, BLACK } = E;
+
+  // Pip count on a normalized board for the mover (+) or opponent (-).
+  function pipNorm(b, sign) {
+    let pips = (sign > 0 ? b.barW : b.barB) * 25;
+    for (let p = 1; p <= 24; p++) {
+      const v = b.points[p];
+      if (sign > 0 && v > 0) pips += p * v;
+      if (sign < 0 && v < 0) pips += (25 - p) * -v;
+    }
+    return pips;
+  }
+
+  // Approximate count (/36) of opponent rolls that hit the mover's blot on `p`.
+  // Geometric estimate (direct + simple combos + doubles); fast enough for the
+  // inner loop. Teach Me uses the engine-exact version below for its claims.
+  function cheapShots(b, p) {
+    const opp = [];
+    for (let q = 1; q < p; q++) if (b.points[q] < 0) opp.push(q);
+    const barOpp = b.barB > 0;
+    const blocked = (i) => i >= 1 && i <= 24 && b.points[i] >= 2;
+    let hits = 0;
+    for (let a = 1; a <= 6; a++) for (let c = 1; c <= 6; c++) {
+      let hit = false;
+      for (const q of opp) { const d = p - q; if (d === a || d === c) hit = true; }
+      if (barOpp && (p === a || p === c)) hit = true;
+      if (!hit) {
+        for (const q of opp) {
+          const d = p - q;
+          if (d === a + c && (!blocked(q + a) || !blocked(q + c))) hit = true;
+        }
+        if (a === c) for (const q of opp) {
+          const d = p - q;
+          if (d > 0 && d % a === 0 && d / a <= 4) {
+            let ok = true;
+            for (let k = 1; k < d / a; k++) if (blocked(q + a * k)) ok = false;
+            if (ok) hit = true;
+          }
+        }
+      }
+      if (hit) hits++;
+    }
+    return hits / 36;
+  }
+
+  // Eval cache (cleared at the start of each top-level ranking) so repeated
+  // reply positions across the 21 opponent rolls aren't re-scored.
+  let evalCache = new Map();
+  function evaluate(board, player) {
+    const ck = E.keyB(board) + ":" + player;
+    const hit = evalCache.get(ck);
+    if (hit !== undefined) return hit;
+    const v = evaluateRaw(board, player);
+    evalCache.set(ck, v);
+    return v;
+  }
+
+  // Positional equity estimate for `player` (higher is better).
+  function evaluateRaw(board, player) {
+    const w = E.winner(board);
+    if (w === player) return 100;
+    if (w === -player) return -100;
+    const b = E.normalized(board, player); // mover is positive
+    let s = 0;
+
+    const pm = pipNorm(b, +1), po = pipNorm(b, -1);
+    s += (po - pm) * 0.10;                 // the race
+    s += (b.offW - b.offB) * 0.5;          // bearing-off progress
+    s += -b.barW * 1.2 + b.barB * 0.9;     // checkers on the bar
+
+    // Home-board / blocking points (golden 5, bar 7, then 4, others).
+    for (let p = 1; p <= 6; p++) if (b.points[p] >= 2) s += p === 5 ? 0.9 : p === 4 ? 0.7 : 0.45;
+    if (b.points[7] >= 2) s += 0.6;        // bar point
+
+    // Advanced anchors in the opponent's home (golden anchor = 20).
+    for (let p = 19; p <= 24; p++) if (b.points[p] <= -2) {} // (opp anchors, ignored here)
+    for (let p = 19; p <= 24; p++) if (b.points[p] >= 2) s += p === 20 ? 0.7 : 0.4;
+
+    // Blots: penalize by how exposed they are.
+    for (let p = 1; p <= 24; p++) if (b.points[p] === 1) s -= 0.25 + 1.2 * cheapShots(b, p);
+
+    // Trapped back checkers, stacking, and burying.
+    let back = 0;
+    for (let p = 19; p <= 24; p++) if (b.points[p] > 0) back += b.points[p];
+    s -= back * 0.12;
+    for (let p = 1; p <= 24; p++) if (b.points[p] > 4) s -= (b.points[p] - 4) * 0.12;
+    s -= Math.max(0, b.points[1] - 2) * 0.10 + Math.max(0, b.points[2] - 2) * 0.05;
+
+    return s;
+  }
+
+  // 1-ply: average over the opponent's 21 rolls, opponent replying greedily.
+  // Opponent replies are deduped by resulting board for speed.
+  function score1ply(resultBoard, player) {
+    if (E.winner(resultBoard) !== null) return evaluate(resultBoard, player);
+    let total = 0, wsum = 0;
+    for (const r of E.allRolls) {
+      const oppPlays = E.uniquePlays(resultBoard, r.d1, r.d2, -player);
+      let bestOpp = -Infinity;
+      for (const pl of oppPlays) { const v = evaluate(pl.result, -player); if (v > bestOpp) bestOpp = v; }
+      if (bestOpp === -Infinity) bestOpp = evaluate(resultBoard, -player);
+      total += r.prob * -bestOpp;
+      wsum += r.prob;
+    }
+    return total / wsum;
+  }
+
+  function scorePlay(play, player, plies) {
+    return plies >= 1 ? score1ply(play.result, player) : evaluate(play.result, player);
+  }
+
+  // How many candidates get the (expensive) 1-ply treatment. The best play is
+  // virtually always within the top few by 0-ply, so this bounds cost sharply.
+  const ONE_PLY_CANDIDATES = 8;
+
+  // Rank legal plays (best first). Candidates are deduped by resulting board;
+  // for 1-ply we pre-sort by 0-ply and only deep-search the top-K. Used by the
+  // AI and by Teach Me.
+  function rankPlays(board, d1, d2, player, plies) {
+    evalCache = new Map(); // fresh cache per top-level decision
+    const unique = E.uniquePlays(board, d1, d2, player);
+    const scored = unique.map((p) => ({ play: p, base: evaluate(p.result, player), score: 0 }));
+    if (plies >= 1) {
+      scored.sort((a, b) => b.base - a.base);
+      const k = Math.min(ONE_PLY_CANDIDATES, scored.length);
+      for (let i = 0; i < scored.length; i++) {
+        scored[i].score = i < k ? score1ply(scored[i].play.result, player)
+                                : scored[i].base - 1e-6; // keep un-searched tail below
+      }
+    } else {
+      for (const s of scored) s.score = s.base;
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((s) => ({ play: s.play, score: s.score }));
+  }
+
+  const LEVELS = {
+    easy: { name: "Easy", plies: 0, blunderRate: 0.35, severity: 6, cube: false },
+    medium: { name: "Medium", plies: 0, blunderRate: 0.15, severity: 3, cube: true },
+    hard: { name: "Hard", plies: 1, blunderRate: 0.04, severity: 2, cube: true },
+    expert: { name: "Expert", plies: 1, blunderRate: 0.0, severity: 1, cube: true },
+  };
+
+  // Choose a play for the AI at a difficulty (with realistic, bounded blunders).
+  function choosePlay(board, d1, d2, player, level, rng) {
+    const cfg = LEVELS[level] || LEVELS.medium;
+    const ranked = rankPlays(board, d1, d2, player, cfg.plies);
+    if (ranked.length <= 1) return ranked[0] ? ranked[0].play : { moves: [], result: board };
+    const r = rng ? rng() : Math.random();
+    if (r < cfg.blunderRate) {
+      const n = Math.min(cfg.severity, ranked.length);
+      return ranked[(rng ? Math.floor(rng() * n) : Math.floor(Math.random() * n))].play;
+    }
+    return ranked[0].play;
+  }
+
+  // Map an equity estimate to a pseudo win-probability (for cube logic / display).
+  const winProb = (board, player) => 1 / (1 + Math.exp(-evaluate(board, player) * 0.5));
+
+  // Cube: should `player` offer a double now? (basic doubling window)
+  function shouldDouble(board, player, level) {
+    const cfg = LEVELS[level] || LEVELS.medium;
+    if (!cfg.cube) return false;
+    const wp = winProb(board, player);
+    return wp >= 0.68 && wp <= 0.88; // double in the window; "too good" plays on
+  }
+  // Cube: should `player` take a double just offered to them?
+  function shouldTake(board, player, level) {
+    const cfg = LEVELS[level] || LEVELS.medium;
+    if (!cfg.cube) return true;
+    return winProb(board, player) >= 0.25; // 25% take point
+  }
+
+  return { evaluate, score1ply, scorePlay, rankPlays, choosePlay, winProb, shouldDouble, shouldTake, cheapShots, LEVELS };
+});
+
+</script>
+  <script>
+// teach.js — "Teach Me" analysis built on the same evaluator the AI uses.
+// Surfaces the best play, classifies the player's choice, and generates the
+// "why" from a before/after diff of the board (mapped to strategy concepts).
+(function (root, factory) {
+  const mod = factory(
+    typeof require === "function" ? require("./engine.js") : root.Engine,
+    typeof require === "function" ? require("./ai.js") : root.AI
+  );
+  if (typeof module === "object" && module.exports) module.exports = mod;
+  else root.Teach = mod;
+})(typeof self !== "undefined" ? self : this, function (E, AI) {
+  "use strict";
+
+  // Teach always analyses at the strongest affordable depth (1-ply), even when
+  // the player is on Easy — the lesson must be correct.
+  const TEACH_PLIES = 1;
+
+  // Engine-exact: how many of 36 rolls let `hitter` hit a blot on `point`.
+  function exactHitRolls(board, point, hitter) {
+    const victim = -hitter;
+    const before = E.count(board, point, victim);
+    if (before !== 1) return 0;
+    let n = 0;
+    for (const r of E.allRolls) {
+      const plays = E.legalPlays(board, r.d1, r.d2, hitter);
+      if (plays.some((p) => E.count(p.result, point, victim) < before)) n += r.prob;
+    }
+    return n; // out of 36
+  }
+
+  // Concept helpers operate in the player's normalized frame (home = 1..6, etc).
+  const madePoint = (after, before, p) => after.points[p] >= 2 && before.points[p] < 2;
+  function blots(b) { let n = 0; for (let p = 1; p <= 24; p++) if (b.points[p] === 1) n++; return n; }
+  function backCheckers(b) { let n = 0; for (let p = 19; p <= 24; p++) if (b.points[p] > 0) n += b.points[p]; return n; }
+
+  function reasonsFor(bestPlay, chosenPlay, board, player) {
+    const before = E.normalized(board, player);
+    const after = E.normalized(bestPlay.result, player);
+    const reasons = [];
+
+    if (madePoint(after, before, 5)) reasons.push("Makes your 5-point (the ‘golden point’) — your most valuable blocking point.");
+    if (madePoint(after, before, 7)) reasons.push("Makes the bar-point, building a wall in front of the opponent’s back checkers.");
+    if (madePoint(after, before, 4)) reasons.push("Makes your 4-point, strengthening your home board.");
+    for (const p of [3, 6]) if (madePoint(after, before, p)) reasons.push(`Makes your ${p}-point.`);
+    if (after.points[20] >= 2 && before.points[20] < 2) reasons.push("Secures the golden anchor (opponent’s 5-point) — your best defensive point.");
+
+    if (backCheckers(after) < backCheckers(before)) reasons.push("Escapes a back checker toward safety.");
+    if (after.barB > before.barB) reasons.push("Hits an opponent blot, sending it to the bar and costing them tempo.");
+    if (blots(after) < blots(before)) reasons.push("Reduces the number of blots you leave exposed.");
+    if (E.off(bestPlay.result, player) > E.off(board, player)) reasons.push("Bears a checker off, banking progress toward the win.");
+
+    // Contrast with the player's choice: quantify extra risk it takes on.
+    if (chosenPlay && chosenPlay !== bestPlay) {
+      let worst = null;
+      for (let p = 1; p <= 24; p++) {
+        if (E.count(chosenPlay.result, p, player) === 1) {
+          const shots = exactHitRolls(chosenPlay.result, p, -player);
+          if (shots > 0 && (!worst || shots > worst.shots)) worst = { point: p, shots };
+        }
+      }
+      if (worst) reasons.push(`Your move leaves a blot hittable by ${worst.shots} of 36 rolls — the recommended move is safer here.`);
+    }
+
+    if (reasons.length === 0) reasons.push("Best by the numbers — it keeps the most flexible position and the best equity.");
+    return reasons;
+  }
+
+  // Verdict thresholds in this evaluator's equity units (not real millipoints).
+  function verdictFrom(loss) {
+    if (loss < 0.02) return "best";
+    if (loss < 0.08) return "good";
+    if (loss < 0.16) return "doubtful";
+    if (loss < 0.35) return "error";
+    return "blunder";
+  }
+
+  // Pre-move: rank the player's options so we can highlight the best.
+  function analyze(board, d1, d2, player) {
+    const ranked = AI.rankPlays(board, d1, d2, player, TEACH_PLIES);
+    return { ranked, best: ranked[0] };
+  }
+
+  // Post-move: grade the play the player actually made.
+  function review(analysis, chosenPlay, board, player) {
+    const best = analysis.best;
+    const chosen = analysis.ranked.find((r) => samePlay(r.play, chosenPlay)) || { play: chosenPlay, score: AI.scorePlay(chosenPlay, player, TEACH_PLIES) };
+    const loss = Math.max(0, best.score - chosen.score);
+    return {
+      verdict: verdictFrom(loss),
+      loss,
+      reasons: reasonsFor(best.play, chosenPlay, board, player),
+      bestPlay: best.play,
+    };
+  }
+
+  function samePlay(a, b) {
+    if (!a || !b || a.moves.length !== b.moves.length) return false;
+    for (let i = 0; i < a.moves.length; i++)
+      if (a.moves[i].from !== b.moves[i].from || a.moves[i].to !== b.moves[i].to) return false;
+    return true;
+  }
+
+  // Tier-aware phrasing of a review.
+  function phrase(review, tier) {
+    const r = review.reasons;
+    if (tier === "beginner") return r[0];
+    if (tier === "advanced") return r.join(" ") + `  (Equity cost of your move: ${review.loss.toFixed(3)}.)`;
+    return r.slice(0, 3).join(" "); // intermediate
+  }
+
+  const VERDICT_LABEL = { best: "Best ✓", good: "Good", doubtful: "Doubtful ?!", error: "Error ?", blunder: "Blunder ??" };
+
+  return { analyze, review, phrase, exactHitRolls, verdictFrom, samePlay, VERDICT_LABEL, TEACH_PLIES };
+});
+
+</script>
+  <script>
+// ui.js — touch UI, turn flow, cube, Teach Me overlay, and persistence.
+(function () {
+  "use strict";
+  const E = window.Engine, AI = window.AI, Teach = window.Teach;
+  const WHITE = E.WHITE, BLACK = E.BLACK; // human = WHITE, AI = BLACK
+  const $ = (id) => document.getElementById(id);
+  const vibrate = (ms) => navigator.vibrate && navigator.vibrate(ms);
+
+  const QUADS = { "q-tl": [13, 14, 15, 16, 17, 18], "q-tr": [19, 20, 21, 22, 23, 24],
+                  "q-bl": [12, 11, 10, 9, 8, 7], "q-br": [6, 5, 4, 3, 2, 1] };
+
+  const S = {
+    board: E.startingBoard(), player: WHITE, phase: "roll",
+    dice: null, plays: [], movesSoFar: [], selected: null, turnStart: null,
+    level: "medium", teach: false, tier: "intermediate",
+    analysis: null, lastReview: null,
+    cube: 1, cubeOwner: null, // null = center, WHITE/BLACK = owner
+    stats: { wins: 0, losses: 0, lossSum: 0, lossN: 0 },
+  };
+
+  // ---------- persistence ----------
+  const KEY = "bg_save_v1";
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({
+      board: S.board, player: S.player, phase: S.phase, level: S.level,
+      teach: S.teach, tier: S.tier, cube: S.cube, cubeOwner: S.cubeOwner, stats: S.stats,
+    })); } catch (e) {}
+  }
+  function load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (!d) return false;
+      Object.assign(S, { board: d.board, player: d.player, level: d.level || "medium",
+        teach: !!d.teach, tier: d.tier || "intermediate", cube: d.cube || 1,
+        cubeOwner: d.cubeOwner ?? null, stats: d.stats || S.stats });
+      // Always resume at a clean roll decision for whoever was on move.
+      S.phase = E.winner(S.board) ? "over" : "roll";
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---------- board DOM ----------
+  function buildBoard() {
+    for (const qid in QUADS) {
+      const q = $(qid); q.innerHTML = "";
+      for (const p of QUADS[qid]) {
+        const pt = document.createElement("div");
+        pt.className = "point"; pt.dataset.point = p;
+        pt.innerHTML = `<span class="label">${p}</span><div class="checkers"></div>`;
+        pt.addEventListener("click", () => onPointTap(p));
+        q.appendChild(pt);
+      }
+    }
+    $("bar-bottom").addEventListener("click", () => onPointTap(25)); // white enters from bar
+    $("tray-bottom").addEventListener("click", () => onPointTap(0)); // white bears off
+  }
+
+  function checkerEl(side, label) {
+    const c = document.createElement("div");
+    c.className = "checker " + side;
+    if (label) c.textContent = label;
+    return c;
+  }
+  function renderStack(container, n, side) {
+    container.innerHTML = "";
+    const shown = Math.min(n, 5);
+    for (let i = 0; i < shown; i++) {
+      const top = i === shown - 1 && n > 5;
+      container.appendChild(checkerEl(side, top ? String(n) : ""));
+    }
+  }
+
+  function render() {
+    const b = S.board;
+    // points
+    for (let p = 1; p <= 24; p++) {
+      const el = document.querySelector(`.point[data-point="${p}"]`);
+      const checkers = el.querySelector(".checkers");
+      const w = E.count(b, p, WHITE), bl = E.count(b, p, BLACK);
+      renderStack(checkers, w || bl, w ? "w" : "b");
+      el.classList.remove("src", "dst", "sel", "bestghost");
+    }
+    // bar
+    renderStack($("bar-bottom").querySelector(".checkers") || mkBarCheckers("bar-bottom"), b.barW, "w");
+    renderStack($("bar-top").querySelector(".checkers") || mkBarCheckers("bar-top"), b.barB, "b");
+    $("bar-bottom").classList.remove("src");
+    // trays
+    $("tray-bottom").querySelector(".count").textContent = "✓ " + b.offW;
+    $("tray-top").querySelector(".count").textContent = "✓ " + b.offB;
+    $("tray-bottom").classList.remove("dst");
+
+    // highlights for current human move
+    if (S.phase === "move" && S.player === WHITE) {
+      const nm = nextMoves();
+      if (S.selected === null) {
+        const srcs = new Set(nm.map((m) => m.from));
+        srcs.forEach((s) => markSource(s));
+      } else {
+        markSelected(S.selected);
+        nm.filter((m) => m.from === S.selected).forEach((m) => markDest(m.to));
+      }
+    }
+    // teach: ghost the best play's destinations pre-move
+    if (S.teach && S.phase === "move" && S.player === WHITE && S.analysis && S.movesSoFar.length === 0) {
+      for (const m of S.analysis.best.play.moves) {
+        if (m.to >= 1 && m.to <= 24) {
+          const el = document.querySelector(`.point[data-point="${m.to}"]`);
+          if (el) el.classList.add("bestghost");
+        }
+      }
+    }
+
+    renderDice();
+    renderCube();
+    renderStatus();
+    renderControls();
+    renderTeach();
+    renderStats();
+  }
+
+  function mkBarCheckers(id) {
+    const el = $(id); let c = el.querySelector(".checkers");
+    if (!c) { c = document.createElement("div"); c.className = "checkers"; el.appendChild(c); }
+    return c;
+  }
+  function markSource(s) { (s === 25 ? $("bar-bottom") : document.querySelector(`.point[data-point="${s}"]`)).classList.add("src"); }
+  function markSelected(s) { (s === 25 ? $("bar-bottom") : document.querySelector(`.point[data-point="${s}"]`)).classList.add("sel"); }
+  function markDest(t) { (t === 0 ? $("tray-bottom") : document.querySelector(`.point[data-point="${t}"]`)).classList.add("dst"); }
+
+  const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  function dieEl(v, used) {
+    const d = document.createElement("div");
+    d.className = "die" + (used ? " used" : "");
+    for (let i = 0; i < 9; i++) {
+      const cell = document.createElement("div");
+      if (PIPS[v].includes(i)) { const pip = document.createElement("div"); pip.className = "pip"; cell.appendChild(pip); }
+      d.appendChild(cell);
+    }
+    return d;
+  }
+  function renderDice() {
+    const row = $("dice"); row.innerHTML = "";
+    if (!S.dice) return;
+    const all = S.dice[0] === S.dice[1] ? [S.dice[0], S.dice[0], S.dice[0], S.dice[0]] : [S.dice[0], S.dice[1]];
+    // mark used dice for the human mid-move
+    const usedVals = S.player === WHITE ? S.movesSoFar.map((m) => m.die) : [];
+    const usedCount = {};
+    usedVals.forEach((v) => (usedCount[v] = (usedCount[v] || 0) + 1));
+    const remain = {};
+    all.forEach((v) => (remain[v] = (remain[v] || 0) + 1));
+    all.forEach((v) => {
+      const isUsed = usedCount[v] > 0;
+      if (isUsed) usedCount[v]--;
+      row.appendChild(dieEl(v, isUsed));
+    });
+  }
+  function renderCube() {
+    const c = $("cube"); c.textContent = S.cube;
+    c.title = S.cubeOwner === null ? "cube (center)" : S.cubeOwner === WHITE ? "you own the cube" : "opponent owns the cube";
+  }
+  function renderStatus() {
+    const w = E.winner(S.board);
+    let msg;
+    if (w === WHITE) msg = "You win — " + label(E.winType(S.board)) + "!";
+    else if (w === BLACK) msg = "Opponent wins — " + label(E.winType(S.board)) + ".";
+    else if (S.phase === "roll") msg = S.player === WHITE ? "Your turn — roll." : "Opponent to roll…";
+    else if (S.phase === "move") msg = "Your move — tap a checker.";
+    else if (S.phase === "aiturn") msg = "Opponent thinking…";
+    else msg = "";
+    $("msg").textContent = msg;
+    $("pips").textContent = `you ${E.pipCount(S.board, WHITE)} · opp ${E.pipCount(S.board, BLACK)}`;
+  }
+  const label = (t) => (t === "single" ? "single" : t === "gammon" ? "gammon (2×)" : "backgammon (3×)");
+
+  function renderControls() {
+    const over = !!E.winner(S.board);
+    $("rollBtn").disabled = !(S.phase === "roll" && S.player === WHITE && !over);
+    $("undoBtn").disabled = !(S.phase === "move" && S.player === WHITE && S.movesSoFar.length > 0);
+    const canDouble = S.phase === "roll" && S.player === WHITE && !over &&
+      AI.LEVELS[S.level].cube && (S.cubeOwner === null || S.cubeOwner === WHITE);
+    $("doubleBtn").disabled = !canDouble;
+  }
+
+  function renderTeach() {
+    const panel = $("teachPanel");
+    if (!S.teach || !S.lastReview) { panel.style.display = "none"; return; }
+    panel.style.display = "block";
+    const r = S.lastReview;
+    panel.querySelector(".verdict").className = "verdict " + r.verdict;
+    panel.querySelector(".verdict").textContent = "Your move: " + Teach.VERDICT_LABEL[r.verdict];
+    panel.querySelector(".why").textContent = Teach.phrase(r, S.tier);
+  }
+  function renderStats() {
+    const pr = S.stats.lossN ? (1000 * S.stats.lossSum / S.stats.lossN).toFixed(0) : "—";
+    $("stats").textContent = `Record ${S.stats.wins}–${S.stats.losses}` +
+      (S.teach ? ` · avg error ${pr} (lower is better)` : "");
+  }
+
+  // ---------- consistent-play tracking ----------
+  function consistent() {
+    return S.plays.filter((p) => p.moves.length >= S.movesSoFar.length &&
+      S.movesSoFar.every((m, i) => p.moves[i].from === m.from && p.moves[i].to === m.to));
+  }
+  function nextMoves() {
+    const idx = S.movesSoFar.length, seen = new Set(), res = [];
+    for (const p of consistent()) if (p.moves.length > idx) {
+      const m = p.moves[idx], k = m.from + ">" + m.to;
+      if (!seen.has(k)) { seen.add(k); res.push(m); }
+    }
+    return res;
+  }
+  const turnComplete = () => S.plays.length > 0 && S.movesSoFar.length === S.plays[0].moves.length;
+
+  // ---------- human interaction ----------
+  function onPointTap(p) {
+    if (S.phase !== "move" || S.player !== WHITE) return;
+    const nm = nextMoves();
+    if (S.selected === null) {
+      if (nm.some((m) => m.from === p)) { S.selected = p; render(); }
+      return;
+    }
+    // a source is already selected
+    const move = nm.find((m) => m.from === S.selected && m.to === p);
+    if (move) { applyHuman(move); return; }
+    if (nm.some((m) => m.from === p)) { S.selected = p; render(); return; } // reselect
+    S.selected = null; render();
+  }
+
+  function applyHuman(move) {
+    S.movesSoFar.push(move);
+    S.board = E.applyMove(S.board, move, WHITE);
+    S.selected = null;
+    vibrate(8);
+    if (turnComplete()) finishHumanTurn();
+    else render();
+  }
+
+  function finishHumanTurn() {
+    // snap to the canonical resulting board of the matching play
+    const match = S.plays.find((p) => Teach.samePlay(p, { moves: S.movesSoFar }));
+    if (match) S.board = match.result;
+    if (S.teach && S.analysis) {
+      S.lastReview = Teach.review(S.analysis, { moves: S.movesSoFar, result: S.board }, S.turnStart, WHITE);
+      S.stats.lossSum += S.lastReview.loss; S.stats.lossN++;
+    }
+    S.plays = []; S.movesSoFar = []; S.analysis = null;
+    if (checkGameOver()) return;
+    S.player = BLACK; S.phase = "aiturn"; save(); render();
+    setTimeout(aiTurn, 650);
+  }
+
+  function rollDice() {
+    if (S.phase !== "roll" || S.player !== WHITE) return;
+    S.dice = [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
+    vibrate(12);
+    S.plays = E.legalPlays(S.board, S.dice[0], S.dice[1], WHITE);
+    S.movesSoFar = []; S.selected = null; S.turnStart = S.board; S.lastReview = null;
+    S.analysis = S.teach ? Teach.analyze(S.board, S.dice[0], S.dice[1], WHITE) : null;
+    if (S.plays.length === 1 && S.plays[0].moves.length === 0) {
+      // no legal move — forfeit
+      S.phase = "aiturn"; S.player = BLACK; render();
+      $("msg").textContent = "No legal move — you forfeit the turn.";
+      setTimeout(() => { S.dice = null; aiTurn(); }, 1000);
+      return;
+    }
+    S.phase = "move"; render();
+  }
+
+  function undo() {
+    if (S.phase !== "move") return;
+    S.board = S.turnStart; S.movesSoFar = []; S.selected = null; render();
+  }
+
+  // ---------- AI ----------
+  function aiTurn() {
+    if (E.winner(S.board)) return;
+    // cube: AI may double before rolling
+    if (AI.LEVELS[S.level].cube && (S.cubeOwner === null || S.cubeOwner === BLACK) &&
+        AI.shouldDouble(S.board, BLACK, S.level)) {
+      offerDoubleToHuman();
+      return;
+    }
+    S.dice = [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
+    render();
+    setTimeout(() => {
+      const play = AI.choosePlay(S.board, S.dice[0], S.dice[1], BLACK, S.level);
+      if (play && play.moves.length) { S.board = play.result; vibrate(6); }
+      if (checkGameOver()) return;
+      S.player = WHITE; S.phase = "roll"; S.dice = null; save(); render();
+    }, 700);
+  }
+
+  // ---------- cube ----------
+  function humanDouble() {
+    if (S.phase !== "roll" || S.player !== WHITE) return;
+    const proposed = S.cube * 2;
+    if (AI.shouldTake(S.board, BLACK, S.level)) {
+      S.cube = proposed; S.cubeOwner = BLACK; // opponent took, now owns cube
+      flash(`Opponent takes. Cube at ${S.cube}.`);
+      render();
+    } else {
+      flash("Opponent passes — you win this game.");
+      endGame(WHITE, /*conceded*/ true);
+    }
+  }
+  function offerDoubleToHuman() {
+    showModal(`Opponent doubles to ${S.cube * 2}.`, [
+      { text: "Take", cls: "primary", on: () => { S.cube *= 2; S.cubeOwner = WHITE; closeModal(); aiAfterCube(); } },
+      { text: "Pass", on: () => { closeModal(); endGame(BLACK, true); } },
+    ]);
+  }
+  function aiAfterCube() {
+    S.dice = [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
+    render();
+    setTimeout(() => {
+      const play = AI.choosePlay(S.board, S.dice[0], S.dice[1], BLACK, S.level);
+      if (play && play.moves.length) S.board = play.result;
+      if (checkGameOver()) return;
+      S.player = WHITE; S.phase = "roll"; S.dice = null; save(); render();
+    }, 700);
+  }
+
+  // ---------- game over ----------
+  function checkGameOver() {
+    const w = E.winner(S.board);
+    if (!w) return false;
+    endGame(w, false);
+    return true;
+  }
+  function endGame(winnerSide, conceded) {
+    const mult = conceded ? 1 : { single: 1, gammon: 2, backgammon: 3 }[E.winType(S.board) || "single"];
+    const pts = S.cube * mult;
+    if (winnerSide === WHITE) S.stats.wins++; else S.stats.losses++;
+    S.phase = "over"; S.dice = null; save(); render();
+    const head = winnerSide === WHITE ? "You win! 🎉" : "Opponent wins";
+    const detail = conceded ? `Cube conceded · ${pts} point${pts > 1 ? "s" : ""}.`
+      : `${label(E.winType(S.board))} × cube ${S.cube} = ${pts} point${pts > 1 ? "s" : ""}.`;
+    showModal(head, [{ text: "New game", cls: "primary", on: () => { closeModal(); newGame(); } }], detail);
+  }
+
+  // ---------- modal ----------
+  function showModal(title, buttons, detail) {
+    closeModal();
+    const m = document.createElement("div"); m.className = "modal"; m.id = "modal";
+    const card = document.createElement("div"); card.className = "card";
+    card.innerHTML = `<h2>${title}</h2>${detail ? `<p>${detail}</p>` : ""}<div class="row"></div>`;
+    buttons.forEach((b) => {
+      const btn = document.createElement("button"); btn.textContent = b.text;
+      if (b.cls === "primary") btn.style.background = "#1c7c4a", btn.style.color = "#fff";
+      else btn.style.background = "#2a3a47", btn.style.color = "#e8edf2";
+      btn.onclick = b.on; card.querySelector(".row").appendChild(btn);
+    });
+    m.appendChild(card); document.body.appendChild(m);
+  }
+  const closeModal = () => { const m = $("modal"); if (m) m.remove(); };
+  function flash(text) { $("msg").textContent = text; }
+
+  // ---------- lifecycle ----------
+  function newGame() {
+    S.board = E.startingBoard(); S.player = WHITE; S.phase = "roll";
+    S.dice = null; S.plays = []; S.movesSoFar = []; S.selected = null;
+    S.cube = 1; S.cubeOwner = null; S.lastReview = null; S.analysis = null;
+    save(); render();
+  }
+
+  function wire() {
+    $("rollBtn").onclick = rollDice;
+    $("undoBtn").onclick = undo;
+    $("doubleBtn").onclick = humanDouble;
+    $("newBtn").onclick = () => { if (confirm("Start a new game?")) newGame(); };
+    $("cube").onclick = humanDouble;
+    $("levelSel").onchange = (e) => { S.level = e.target.value; save(); render(); };
+    $("teachChk").onchange = (e) => { S.teach = e.target.checked; S.lastReview = null;
+      if (S.teach && S.phase === "move") S.analysis = Teach.analyze(S.turnStart, S.dice[0], S.dice[1], WHITE);
+      save(); render(); };
+    $("tierSel").onchange = (e) => { S.tier = e.target.value; save(); render(); };
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    buildBoard(); wire();
+    load();
+    $("levelSel").value = S.level; $("teachChk").checked = S.teach; $("tierSel").value = S.tier;
+    render();
+  });
+})();
+
+</script>
+</body>
+</html>

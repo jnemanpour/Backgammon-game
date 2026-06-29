@@ -28,9 +28,13 @@ Two things live here:
 - **Locally:** `cd web && python3 -m http.server` then open
   `http://localhost:8000/` (uses the modular files), or just open
   `web/play.html` directly.
-- **GitHub Pages (clean URL):** repo **Settings → Pages → Source: Deploy from a
-  branch → `/web` folder**, then visit the published URL. (Rebuild the single
-  file after editing any `web/*.js`: `python3 web/build_play.py`.)
+- **GitHub Pages (clean public URL):** repo **Settings → Pages → Source: Deploy
+  from a branch → branch `claude/new-session-n6cccq`, folder `/docs` → Save**.
+  After ~1 minute the game is live at
+  `https://jnemanpour.github.io/Backgammon-game/`. The site is served from
+  `docs/`, which mirrors the `web/` runtime files; rerun `python3
+  web/build_play.py` after editing any `web/*.js` to refresh both `play.html`
+  and the `docs/` copy.
 
 Pick a difficulty (Easy/Medium/Hard/Expert), toggle **Teach** for best-move
 hints and verdicts, and use the cube to double. You play White (bottom-right

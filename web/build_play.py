@@ -37,3 +37,14 @@ with open(out, "w", encoding="utf-8") as f:
 leftover = re.findall(r'(src|href)="(?!data:)[^"]+\.(?:js|css)"', html)
 print("wrote", out, f"({len(html)} bytes)")
 print("remaining external refs:", leftover or "none")
+
+# Sync the runtime files into /docs so GitHub Pages can serve them via the
+# "Deploy from a branch -> /docs" option (no Actions/enable step required).
+import shutil
+docs = os.path.normpath(os.path.join(HERE, "..", "docs"))
+os.makedirs(docs, exist_ok=True)
+runtime = ["index.html", "engine.js", "ai.js", "teach.js", "ui.js", "style.css", "play.html"]
+for name in runtime:
+    shutil.copyfile(os.path.join(HERE, name), os.path.join(docs, name))
+open(os.path.join(docs, ".nojekyll"), "w").close()  # serve files as-is
+print("synced site -> docs/:", ", ".join(runtime))
