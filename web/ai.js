@@ -186,3 +186,4 @@
 
   return { evaluate, score1ply, scorePlay, rankPlays, choosePlay, winProb, shouldDouble, shouldTake, cheapShots, LEVELS };
 });
+

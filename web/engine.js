@@ -180,3 +180,4 @@
     singleStepMoves, applyNorm, applyMove, legalPlays, uniquePlays, keyB, allRolls,
   };
 });
+

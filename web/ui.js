@@ -206,7 +206,7 @@
     if (w === WHITE) msg = "You win — " + label(E.winType(S.board)) + "!";
     else if (w === BLACK) msg = "Opponent wins — " + label(E.winType(S.board)) + ".";
     else if (S.phase === "roll") msg = S.player === WHITE ? "Your turn — roll." : "Opponent to roll…";
-    else if (S.phase === "move") msg = "Your move — tap a checker.";
+    else if (S.phase === "move") msg = S.selected !== null ? "Tap a spot — or tap the checker again to play it." : "Your move — tap a checker.";
     else if (S.phase === "aiturn") msg = "Opponent thinking…";
     else msg = "";
     $("msg").textContent = msg;
@@ -217,16 +217,22 @@
   function renderControls() {
     const over = !!E.winner(S.board);
     const busy = S.animating;
-    $("rollBtn").disabled = busy || !(S.phase === "roll" && S.player === WHITE && !over);
-    $("undoBtn").disabled = busy || !(S.phase === "move" && S.player === WHITE && S.movesSoFar.length > 0);
-    const canDouble = !busy && S.phase === "roll" && S.player === WHITE && !over &&
+    const yourRoll = !over && S.phase === "roll" && S.player === WHITE;
+    const yourMove = !over && S.phase === "move" && S.player === WHITE;
+    const roll = $("rollBtn"), undo = $("undoBtn");
+    // one button at a time: Roll before the roll, Undo once you've rolled
+    roll.style.display = yourRoll ? "" : "none";
+    undo.style.display = yourMove ? "" : "none";
+    roll.disabled = busy || !yourRoll;
+    undo.disabled = busy || !yourMove || S.movesSoFar.length === 0;
+    const canDouble = !busy && yourRoll &&
       AI.LEVELS[S.level].cube && (S.cubeOwner === null || S.cubeOwner === WHITE);
-    $("doubleBtn").disabled = !canDouble;
+    $("cube").classList.toggle("can", canDouble);
   }
 
   function renderTeach() {
     const panel = $("teachPanel");
-    if (!S.teach || !S.lastReview) { panel.style.display = "none"; return; }
+    if (!S.teach || !S.lastReview || S.teachDismissed) { panel.style.display = "none"; return; }
     panel.style.display = "block";
     const r = S.lastReview;
     panel.querySelector(".verdict").className = "verdict " + r.verdict;
@@ -361,11 +367,31 @@
       if (nm.some((m) => m.from === p)) { S.selected = p; render(); }
       return;
     }
+    // tap the already-selected checker again -> just send it where it'd go
+    if (p === S.selected) { autoMoveFrom(p, nm); return; }
     // a source is already selected
     const move = nm.find((m) => m.from === S.selected && m.to === p);
     if (move) { applyHuman(move); return; }
     if (nm.some((m) => m.from === p)) { S.selected = p; render(); return; } // reselect
     S.selected = null; render();
+  }
+
+  // Tapping a selected checker a second time plays its move automatically:
+  // the teaching-recommended destination if known, else the move that travels
+  // farthest (uses the larger die). If there's only one option, it just goes.
+  function autoMoveFrom(p, nm) {
+    const opts = nm.filter((m) => m.from === p);
+    if (!opts.length) { S.selected = null; render(); return; }
+    let pick = null;
+    if (S.analysis && S.analysis.best && S.analysis.best.play) {
+      const rec = S.analysis.best.play.moves.find((m) => m.from === p);
+      if (rec) pick = opts.find((m) => m.to === rec.to);
+    }
+    if (!pick) {
+      const dist = (m) => (m.to === 0 ? 99 : p - m.to); // bear-off travels farthest
+      pick = opts.reduce((a, b) => (dist(b) > dist(a) ? b : a));
+    }
+    applyHuman(pick);
   }
 
   function applyHuman(move) {
@@ -386,6 +412,7 @@
     if (match) S.board = match.result;
     if (S.teach && S.analysis) {
       S.lastReview = Teach.review(S.analysis, { moves: S.movesSoFar, result: S.board }, S.turnStart, WHITE);
+      S.teachDismissed = false;
       S.stats.lossSum += S.lastReview.loss; S.stats.lossN++;
     }
     S.plays = []; S.movesSoFar = []; S.analysis = null;
@@ -451,7 +478,10 @@
 
   // ---------- cube ----------
   function humanDouble() {
-    if (S.phase !== "roll" || S.player !== WHITE) return;
+    const over = !!E.winner(S.board);
+    const canDouble = !S.animating && S.phase === "roll" && S.player === WHITE && !over &&
+      AI.LEVELS[S.level].cube && (S.cubeOwner === null || S.cubeOwner === WHITE);
+    if (!canDouble) return;
     const proposed = S.cube * 2;
     if (AI.shouldTake(S.board, BLACK, S.level)) {
       S.cube = proposed; S.cubeOwner = BLACK; // opponent took, now owns cube
@@ -573,10 +603,10 @@
     // in-game controls
     $("rollBtn").onclick = rollDice;
     $("undoBtn").onclick = undo;
-    $("doubleBtn").onclick = humanDouble;
     $("cube").onclick = humanDouble;
     $("homeBtn").onclick = openGameMenu;
     $("teachBtn").onclick = () => { setTeach(!S.teach); };
+    $("teachClose").onclick = () => { S.teachDismissed = true; $("teachPanel").style.display = "none"; };
 
     // home-screen controls
     document.querySelectorAll("#homeLevel button").forEach((b) => {
@@ -595,3 +625,4 @@
     showScreen("home");
   });
 })();
+

@@ -78,17 +78,17 @@
           <div class="tray" id="tray-bottom"><span class="count">0</span></div>
         </div>
         <div id="dice" class="dice-overlay"></div>
-      </div>
 
-      <div class="controls">
-        <button id="rollBtn" class="primary">Roll</button>
-        <button id="undoBtn">Undo</button>
-        <button id="doubleBtn">Double</button>
-      </div>
+        <div class="dock">
+          <button id="rollBtn" class="dockbtn primary" title="Roll dice" aria-label="Roll dice"><span class="ic">⚅</span></button>
+          <button id="undoBtn" class="dockbtn" title="Undo move" aria-label="Undo move" style="display:none"><span class="ic">↺</span></button>
+        </div>
 
-      <div class="teachPanel" id="teachPanel" style="display:none">
-        <div class="verdict"></div>
-        <div class="why"></div>
+        <div class="teachPanel" id="teachPanel" style="display:none">
+          <button class="teach-close" id="teachClose" title="Dismiss" aria-label="Dismiss">×</button>
+          <div class="verdict"></div>
+          <div class="why"></div>
+        </div>
       </div>
     </section>
 
