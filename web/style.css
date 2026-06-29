@@ -208,6 +208,9 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
   grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 5px; box-shadow: 0 2px 4px rgba(0,0,0,.4);
   transition: opacity .2s, transform .2s; }
 .die.used { opacity: .35; transform: scale(.9); }
+/* brown dice for the brown (AI) player's turn */
+.die.brown { background: linear-gradient(160deg, #5b3d22, #38230f); }
+.die.brown .pip { background: #efe2c7; }
 #dice.rolling .die { animation: tumble .14s linear infinite; }
 @keyframes tumble {
   0% { transform: rotate(0) scale(1); } 25% { transform: rotate(-12deg) scale(1.08); }

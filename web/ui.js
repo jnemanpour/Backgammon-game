@@ -167,7 +167,7 @@
   const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
   function dieEl(v, used, settle) {
     const d = document.createElement("div");
-    d.className = "die" + (used ? " used" : "") + (settle ? " settle" : "");
+    d.className = "die" + (S.player === BLACK ? " brown" : "") + (used ? " used" : "") + (settle ? " settle" : "");
     for (let i = 0; i < 9; i++) {
       const cell = document.createElement("div");
       if (PIPS[v].includes(i)) { const pip = document.createElement("div"); pip.className = "pip"; cell.appendChild(pip); }

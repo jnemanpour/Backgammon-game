@@ -218,6 +218,9 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
   grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 5px; box-shadow: 0 2px 4px rgba(0,0,0,.4);
   transition: opacity .2s, transform .2s; }
 .die.used { opacity: .35; transform: scale(.9); }
+/* brown dice for the brown (AI) player's turn */
+.die.brown { background: linear-gradient(160deg, #5b3d22, #38230f); }
+.die.brown .pip { background: #efe2c7; }
 #dice.rolling .die { animation: tumble .14s linear infinite; }
 @keyframes tumble {
   0% { transform: rotate(0) scale(1); } 25% { transform: rotate(-12deg) scale(1.08); }
@@ -1008,7 +1011,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
   const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
   function dieEl(v, used, settle) {
     const d = document.createElement("div");
-    d.className = "die" + (used ? " used" : "") + (settle ? " settle" : "");
+    d.className = "die" + (S.player === BLACK ? " brown" : "") + (used ? " used" : "") + (settle ? " settle" : "");
     for (let i = 0; i < 9; i++) {
       const cell = document.createElement("div");
       if (PIPS[v].includes(i)) { const pip = document.createElement("div"); pip.className = "pip"; cell.appendChild(pip); }
