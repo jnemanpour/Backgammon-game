@@ -38,13 +38,23 @@ leftover = re.findall(r'(src|href)="(?!data:)[^"]+\.(?:js|css)"', html)
 print("wrote", out, f"({len(html)} bytes)")
 print("remaining external refs:", leftover or "none")
 
-# Sync the runtime files into /docs so GitHub Pages can serve them via the
-# "Deploy from a branch -> /docs" option (no Actions/enable step required).
-import shutil
+# Publish to /docs for GitHub Pages ("Deploy from a branch -> /docs").
+#
+# IMPORTANT: docs/index.html is written as the SELF-CONTAINED build (CSS + JS
+# inlined). Serving one file avoids the classic stale-cache bug where the CDN
+# hands back a new index.html with an old style.css, producing a half-styled
+# page. With everything inlined there is no separate asset to go stale — a
+# single reload always yields a consistent version.
 docs = os.path.normpath(os.path.join(HERE, "..", "docs"))
 os.makedirs(docs, exist_ok=True)
-runtime = ["index.html", "engine.js", "ai.js", "teach.js", "ui.js", "style.css", "play.html"]
-for name in runtime:
-    shutil.copyfile(os.path.join(HERE, name), os.path.join(docs, name))
+for name in ("index.html", "play.html"):
+    with open(os.path.join(docs, name), "w", encoding="utf-8") as f:
+        f.write(html)
 open(os.path.join(docs, ".nojekyll"), "w").close()  # serve files as-is
-print("synced site -> docs/:", ", ".join(runtime))
+
+# Remove the now-unused modular copies so docs/ has no stale, unreferenced assets.
+for name in ("engine.js", "ai.js", "teach.js", "ui.js", "style.css"):
+    p = os.path.join(docs, name)
+    if os.path.exists(p):
+        os.remove(p)
+print("published self-contained docs/index.html and docs/play.html")
