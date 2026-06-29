@@ -3,37 +3,83 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#14181d" />
+  <meta name="theme-color" content="#241a11" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Backgammon</title>
   <!-- self-contained build; edit web/*.js and rerun build_play.py -->
   <style>
 :root {
-  --felt: #0f5132;
-  --felt-dark: #0b3d26;
-  --wood: #6b4226;
-  --wood-light: #8a5a36;
-  --pt-light: #d9b38c;
-  --pt-dark: #a9744f;
-  --white-checker: #f4efe2;
-  --white-edge: #b9b09a;
-  --black-checker: #2b2b2b;
-  --black-edge: #000;
-  --hi-src: #ffd54a;
-  --hi-dst: #4ad6ff;
-  --bg: #14181d;
-  --panel: #1d242b;
-  --text: #e8edf2;
-  --muted: #9fb0bd;
+  --felt: #a87c4e;          /* tan suede playing surface */
+  --felt-dark: #8a6238;     /* bear-off tray felt */
+  --wood: #3f2a1a;          /* dark leather frame */
+  --wood-light: #5a3d26;    /* center bar / lighter leather */
+  --pt-light: #e7d9bb;      /* cream point */
+  --pt-dark: #45301f;       /* dark-brown point */
+  --white-checker: #efe5cf; /* ivory checker body */
+  --white-edge: #c7ba94;
+  --black-checker: #412d1c; /* chocolate checker body */
+  --black-edge: #241910;
+  --hi-src: #1f7bd6;        /* source highlight (blue) */
+  --hi-dst: #2bb24a;        /* destination highlight (green) */
+  --bg: #241a11;            /* warm dark backdrop */
+  --panel: #34271a;
+  --text: #f1e8d6;
+  --muted: #c2ad8d;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   height: 100%; overflow: hidden; }
 #app { max-width: 540px; margin: 0 auto; padding: 6px 8px;
-  height: 100vh; height: 100dvh; display: flex; flex-direction: column; gap: 5px; }
+  height: 100vh; height: 100dvh; display: flex; flex-direction: column;
+  background-color: #5e3f24;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(0,0,0,.05) 0 2px, rgba(255,255,255,.022) 2px 5px),
+    linear-gradient(180deg, #6b482a, #46301b); }
 /* fixed-height rows; the board flexes to fill what's left */
-.topbar, .status, .diceRow, .controls, .teachPanel, .stats { flex: 0 0 auto; }
+.gamebar, .diceRow, .controls, .teachPanel { flex: 0 0 auto; }
+
+/* ===== screens ===== */
+.screen { display: none; }
+.screen.active { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; gap: 5px; }
+
+/* ===== home screen ===== */
+#home { align-items: center; justify-content: center; gap: 16px; padding: 12px; }
+.home-plaque { font-size: 30px; font-weight: 800; letter-spacing: .5px; color: #ffe2a6;
+  text-shadow: 0 1px 0 #3a2410, 0 2px 6px rgba(0,0,0,.6);
+  padding: 14px 30px; border-radius: 14px;
+  background: linear-gradient(180deg, #7a3f23, #4e2614);
+  border: 2px solid #caa15a;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.25), 0 4px 10px rgba(0,0,0,.5); }
+.home-panel { width: 100%; max-width: 360px; background: rgba(38,26,15,.72);
+  border: 1px solid #6b4c2c; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field.row { flex-direction: row; align-items: center; justify-content: space-between; }
+.field-label { color: #e9d6b4; font-size: 14px; font-weight: 600; }
+.seg { display: flex; gap: 4px; background: #2a1c10; border-radius: 10px; padding: 4px; }
+.seg button { flex: 1; padding: 9px 4px; border: none; border-radius: 7px; background: transparent;
+  color: #d9c3a0; font-size: 13px; font-weight: 600; }
+.seg button.on { background: linear-gradient(180deg, #b07a3c, #8a5a2b); color: #fff;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.3); }
+#home select { background: #2a1c10; color: var(--text); border: 1px solid #6b4c2c; border-radius: 8px; padding: 7px 10px; font-size: 14px; }
+#home .toggle input { width: 20px; height: 20px; }
+.home-actions { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 10px; }
+.bigbtn { padding: 15px; border-radius: 12px; font-size: 17px; font-weight: 700;
+  border: 2px solid #6b4c2c; background: linear-gradient(180deg, #5a3d24, #3f2a18); color: #f0e2c8;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.18), 0 3px 8px rgba(0,0,0,.4); }
+.bigbtn.primary { background: linear-gradient(180deg, #c08a3e, #9a6a33); border-color: #caa15a; color: #fff; }
+.bigbtn:active { transform: scale(.98); }
+.home-stats { color: #d3bd98; font-size: 13px; }
+
+/* ===== game top bar ===== */
+.gamebar { display: flex; align-items: center; gap: 8px; padding: 2px 2px; }
+.gamebar .msg { flex: 1; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gamebar .pips { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.iconbtn { width: 38px; height: 34px; flex: 0 0 auto; border-radius: 9px; border: 1px solid #6b4c2c;
+  background: linear-gradient(180deg, #6a4828, #45301b); color: #f0e2c8; font-size: 17px; line-height: 1; }
+.iconbtn.on { background: linear-gradient(180deg, #c08a3e, #9a6a33); border-color: #caa15a; }
+.iconbtn:active { transform: scale(.95); }
 
 .topbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .topbar h1 { font-size: 18px; margin: 0; flex: 1; font-weight: 700; }
@@ -80,10 +126,10 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
 .checker { width: 84%; max-width: 30px; aspect-ratio: 1; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
   margin: -1px 0; box-shadow: 0 1px 2px rgba(0,0,0,.45), inset 0 1px 1px rgba(255,255,255,.35); }
-.checker.w { background: radial-gradient(circle at 35% 30%, #fff, var(--white-checker));
-  border: 1.5px solid var(--white-edge); color: #333; }
-.checker.b { background: radial-gradient(circle at 35% 30%, #555, var(--black-checker));
-  border: 1.5px solid var(--black-edge); color: #eee; }
+.checker.w { background: radial-gradient(circle at 35% 28%, #fffaf0, var(--white-checker));
+  border: 1.5px solid var(--white-edge); color: #4a3a22; }
+.checker.b { background: radial-gradient(circle at 35% 28%, #71502f, var(--black-checker));
+  border: 1.5px solid var(--black-edge); color: #efe0c8; }
 
 /* stacked checkers in bar/tray are smaller */
 .bar .checker, .tray .checker { width: 70%; max-width: 22px; }
@@ -99,7 +145,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
 .point.sel::after { content: ""; position: absolute; inset: 0; border: 3px solid #fff;
   border-radius: 6px; z-index: 5; pointer-events: none; }
 .bar, .tray { position: relative; }
-.bestghost { outline: 3px dashed #7CFC9A; outline-offset: -3px; transition: outline-color .2s; }
+.bestghost { outline: 3px dashed #ffb300; outline-offset: -3px; transition: outline-color .2s; }
 @keyframes pulseGlow { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
 
 /* a checker mid-flight between points */
@@ -124,16 +170,16 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
 .die.settle { animation: settleDie .26s cubic-bezier(.34,1.56,.64,1); }
 @keyframes settleDie { 0% { transform: scale(1.25); } 100% { transform: scale(1); } }
 .die .pip { width: 7px; height: 7px; border-radius: 50%; background: #222; align-self: center; justify-self: center; }
-.cube { width: 40px; height: 40px; border: 2px solid #cfd8dc; border-radius: 8px; background: #11161b;
-  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; }
+.cube { width: 40px; height: 40px; border: 2px solid #d8c9a8; border-radius: 8px; background: #2a1f14;
+  color: var(--text); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; }
 .cube small { font-size: 9px; color: var(--muted); position: absolute; margin-top: 28px; }
 
 .controls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
 .controls button { flex: 1; min-width: 92px; font-weight: 600; }
-.controls button.primary { background: #1c7c4a; border-color: #1c7c4a; }
+.controls button.primary { background: #9a6a33; border-color: #9a6a33; color: #fff; }
 .controls button.primary:not(:disabled) { animation: rollPulse 1.6s ease-in-out infinite; }
-@keyframes rollPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(40,180,110,.5); }
-  50% { box-shadow: 0 0 0 6px rgba(40,180,110,0); } }
+@keyframes rollPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(190,140,70,.55); }
+  50% { box-shadow: 0 0 0 6px rgba(190,140,70,0); } }
 .controls button:disabled { opacity: .4; animation: none; }
 .controls button { transition: transform .08s, opacity .2s; }
 .controls button:active:not(:disabled) { transform: scale(.96); }
@@ -159,62 +205,91 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
 </head>
 <body>
   <div id="app">
-    <div class="topbar">
-      <h1>Backgammon</h1>
-      <select id="levelSel" title="Difficulty">
-        <option value="easy">Easy</option>
-        <option value="medium">Medium</option>
-        <option value="hard">Hard</option>
-        <option value="expert">Expert</option>
-      </select>
-      <label class="toggle"><input type="checkbox" id="teachChk" /> Teach</label>
-      <label class="toggle"><input type="checkbox" id="soundChk" checked /> 🔊</label>
-      <select id="tierSel" title="Explanation level">
-        <option value="beginner">Beginner</option>
-        <option value="intermediate">Intermediate</option>
-        <option value="advanced">Advanced</option>
-      </select>
-    </div>
 
-    <div class="status">
-      <span class="msg" id="msg"></span>
-      <span class="pips" id="pips"></span>
-    </div>
+    <!-- ===== HOME SCREEN ===== -->
+    <section id="home" class="screen active">
+      <div class="home-plaque">Backgammon</div>
 
-    <div id="board">
-      <div class="board-half top">
-        <div class="quadrant" id="q-tl"></div>
-        <div class="bar" id="bar-top"></div>
-        <div class="quadrant" id="q-tr"></div>
-        <div class="tray" id="tray-top"><span class="count">✓ 0</span></div>
+      <div class="home-panel">
+        <div class="field">
+          <span class="field-label">Difficulty</span>
+          <div class="seg" id="homeLevel">
+            <button type="button" data-level="easy">Easy</button>
+            <button type="button" data-level="medium">Medium</button>
+            <button type="button" data-level="hard">Hard</button>
+            <button type="button" data-level="expert">Expert</button>
+          </div>
+        </div>
+
+        <label class="field row toggle">
+          <span class="field-label">Teaching mode</span>
+          <input type="checkbox" id="homeTeach" />
+        </label>
+
+        <div class="field row" id="tierRow">
+          <span class="field-label">Hint detail</span>
+          <select id="homeTier">
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </div>
+
+        <label class="field row toggle">
+          <span class="field-label">Sound &amp; haptics</span>
+          <input type="checkbox" id="homeSound" checked />
+        </label>
       </div>
-      <div class="board-half bottom">
-        <div class="quadrant" id="q-bl"></div>
-        <div class="bar" id="bar-bottom"></div>
-        <div class="quadrant" id="q-br"></div>
-        <div class="tray" id="tray-bottom"><span class="count">✓ 0</span></div>
+
+      <div class="home-actions">
+        <button id="resumeBtn" class="bigbtn">Resume game</button>
+        <button id="playBtn" class="bigbtn primary">New game</button>
       </div>
-    </div>
 
-    <div class="diceRow">
-      <div id="cube" class="cube">1</div>
-      <div id="dice"></div>
-    </div>
+      <div class="home-stats" id="homeStats"></div>
+    </section>
 
-    <div class="controls">
-      <button id="rollBtn" class="primary">Roll</button>
-      <button id="undoBtn">Undo</button>
-      <button id="doubleBtn">Double</button>
-      <button id="newBtn">New Game</button>
-    </div>
+    <!-- ===== GAME SCREEN ===== -->
+    <section id="game" class="screen">
+      <div class="gamebar">
+        <button id="homeBtn" class="iconbtn" title="Menu">☰</button>
+        <span class="msg" id="msg"></span>
+        <span class="pips" id="pips"></span>
+        <button id="teachBtn" class="iconbtn" title="Teaching hints">💡</button>
+      </div>
 
-    <div class="teachPanel" id="teachPanel" style="display:none">
-      <div class="verdict"></div>
-      <div class="why"></div>
-    </div>
+      <div id="board">
+        <div class="board-half top">
+          <div class="quadrant" id="q-tl"></div>
+          <div class="bar" id="bar-top"></div>
+          <div class="quadrant" id="q-tr"></div>
+          <div class="tray" id="tray-top"><span class="count">0</span></div>
+        </div>
+        <div class="board-half bottom">
+          <div class="quadrant" id="q-bl"></div>
+          <div class="bar" id="bar-bottom"></div>
+          <div class="quadrant" id="q-br"></div>
+          <div class="tray" id="tray-bottom"><span class="count">0</span></div>
+        </div>
+      </div>
 
-    <div class="stats" id="stats"></div>
-    <div class="stats">You are White (bottom-right home). Tap a checker, then its destination.</div>
+      <div class="diceRow">
+        <div id="cube" class="cube">1</div>
+        <div id="dice"></div>
+      </div>
+
+      <div class="controls">
+        <button id="rollBtn" class="primary">Roll</button>
+        <button id="undoBtn">Undo</button>
+        <button id="doubleBtn">Double</button>
+      </div>
+
+      <div class="teachPanel" id="teachPanel" style="display:none">
+        <div class="verdict"></div>
+        <div class="why"></div>
+      </div>
+    </section>
+
   </div>
 
   <script>
@@ -865,7 +940,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
     renderStatus();
     renderControls();
     renderTeach();
-    renderStats();
+    $("teachBtn").classList.toggle("on", S.teach);
   }
 
   function mkBarCheckers(id) {
@@ -947,9 +1022,10 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
     panel.querySelector(".why").textContent = Teach.phrase(r, S.tier);
   }
   function renderStats() {
+    const el = $("homeStats"); if (!el) return;
     const pr = S.stats.lossN ? (1000 * S.stats.lossSum / S.stats.lossN).toFixed(0) : "—";
-    $("stats").textContent = `Record ${S.stats.wins}–${S.stats.losses}` +
-      (S.teach ? ` · avg error ${pr} (lower is better)` : "");
+    el.textContent = `Record ${S.stats.wins}–${S.stats.losses}` +
+      (S.stats.lossN ? ` · avg error ${pr} (lower is better)` : "");
   }
 
   // ---------- animation ----------
@@ -1212,7 +1288,10 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
     const head = winnerSide === WHITE ? "You win! 🎉" : "Opponent wins";
     const detail = conceded ? `Cube conceded · ${pts} point${pts > 1 ? "s" : ""}.`
       : `${label(E.winType(S.board))} × cube ${S.cube} = ${pts} point${pts > 1 ? "s" : ""}.`;
-    showModal(head, [{ text: "New game", cls: "primary", on: () => { closeModal(); newGame(); } }], detail);
+    showModal(head, [
+      { text: "Play again", cls: "primary", on: () => { closeModal(); newGame(); } },
+      { text: "Menu", on: () => { closeModal(); showScreen("home"); } },
+    ], detail);
   }
 
   // ---------- modal ----------
@@ -1240,26 +1319,68 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
     save(); render();
   }
 
+  // ---------- screens & menu ----------
+  const STARTKEY = E.keyB(E.startingBoard());
+  function gameInProgress() { return E.winner(S.board) === null && E.keyB(S.board) !== STARTKEY; }
+
+  function showScreen(name) {
+    $("home").classList.toggle("active", name === "home");
+    $("game").classList.toggle("active", name === "game");
+    if (name === "home") syncHome();
+    else render();
+  }
+
+  function syncHome() {
+    document.querySelectorAll("#homeLevel button").forEach((b) =>
+      b.classList.toggle("on", b.dataset.level === S.level));
+    $("homeTeach").checked = S.teach;
+    $("homeTier").value = S.tier;
+    $("homeSound").checked = S.sound;
+    $("tierRow").style.display = S.teach ? "flex" : "none";
+    $("resumeBtn").style.display = gameInProgress() ? "block" : "none";
+    renderStats();
+  }
+
+  function setTeach(on) {
+    S.teach = on; S.lastReview = null;
+    if (on && S.phase === "move" && S.dice) S.analysis = Teach.analyze(S.turnStart, S.dice[0], S.dice[1], WHITE);
+    if (!on) S.analysis = null;
+    save();
+    if ($("game").classList.contains("active")) render();
+  }
+
+  function openGameMenu() {
+    showModal("Menu", [
+      { text: "Continue", cls: "primary", on: () => closeModal() },
+      { text: "New game", on: () => { closeModal(); newGame(); } },
+      { text: "End game", on: () => { closeModal(); newGame(); showScreen("home"); } },
+    ]);
+  }
+
   function wire() {
+    // in-game controls
     $("rollBtn").onclick = rollDice;
     $("undoBtn").onclick = undo;
     $("doubleBtn").onclick = humanDouble;
-    $("newBtn").onclick = () => { if (confirm("Start a new game?")) newGame(); };
     $("cube").onclick = humanDouble;
-    $("levelSel").onchange = (e) => { S.level = e.target.value; save(); render(); };
-    $("teachChk").onchange = (e) => { S.teach = e.target.checked; S.lastReview = null;
-      if (S.teach && S.phase === "move") S.analysis = Teach.analyze(S.turnStart, S.dice[0], S.dice[1], WHITE);
-      save(); render(); };
-    $("tierSel").onchange = (e) => { S.tier = e.target.value; save(); render(); };
-    $("soundChk").onchange = (e) => { S.sound = e.target.checked; if (S.sound) sfx.move(); save(); };
+    $("homeBtn").onclick = openGameMenu;
+    $("teachBtn").onclick = () => { setTeach(!S.teach); };
+
+    // home-screen controls
+    document.querySelectorAll("#homeLevel button").forEach((b) => {
+      b.onclick = () => { S.level = b.dataset.level; save(); syncHome(); };
+    });
+    $("homeTeach").onchange = (e) => { setTeach(e.target.checked); syncHome(); };
+    $("homeTier").onchange = (e) => { S.tier = e.target.value; save(); };
+    $("homeSound").onchange = (e) => { S.sound = e.target.checked; if (S.sound) sfx.move(); save(); };
+    $("playBtn").onclick = () => { newGame(); showScreen("game"); };
+    $("resumeBtn").onclick = () => { showScreen("game"); };
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     buildBoard(); wire();
     load();
-    $("levelSel").value = S.level; $("teachChk").checked = S.teach; $("tierSel").value = S.tier;
-    $("soundChk").checked = S.sound;
-    render();
+    showScreen("home");
   });
 })();
 

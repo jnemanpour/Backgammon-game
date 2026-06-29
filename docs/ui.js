@@ -152,7 +152,7 @@
     renderStatus();
     renderControls();
     renderTeach();
-    renderStats();
+    $("teachBtn").classList.toggle("on", S.teach);
   }
 
   function mkBarCheckers(id) {
@@ -234,9 +234,10 @@
     panel.querySelector(".why").textContent = Teach.phrase(r, S.tier);
   }
   function renderStats() {
+    const el = $("homeStats"); if (!el) return;
     const pr = S.stats.lossN ? (1000 * S.stats.lossSum / S.stats.lossN).toFixed(0) : "—";
-    $("stats").textContent = `Record ${S.stats.wins}–${S.stats.losses}` +
-      (S.teach ? ` · avg error ${pr} (lower is better)` : "");
+    el.textContent = `Record ${S.stats.wins}–${S.stats.losses}` +
+      (S.stats.lossN ? ` · avg error ${pr} (lower is better)` : "");
   }
 
   // ---------- animation ----------
@@ -499,7 +500,10 @@
     const head = winnerSide === WHITE ? "You win! 🎉" : "Opponent wins";
     const detail = conceded ? `Cube conceded · ${pts} point${pts > 1 ? "s" : ""}.`
       : `${label(E.winType(S.board))} × cube ${S.cube} = ${pts} point${pts > 1 ? "s" : ""}.`;
-    showModal(head, [{ text: "New game", cls: "primary", on: () => { closeModal(); newGame(); } }], detail);
+    showModal(head, [
+      { text: "Play again", cls: "primary", on: () => { closeModal(); newGame(); } },
+      { text: "Menu", on: () => { closeModal(); showScreen("home"); } },
+    ], detail);
   }
 
   // ---------- modal ----------
@@ -527,25 +531,67 @@
     save(); render();
   }
 
+  // ---------- screens & menu ----------
+  const STARTKEY = E.keyB(E.startingBoard());
+  function gameInProgress() { return E.winner(S.board) === null && E.keyB(S.board) !== STARTKEY; }
+
+  function showScreen(name) {
+    $("home").classList.toggle("active", name === "home");
+    $("game").classList.toggle("active", name === "game");
+    if (name === "home") syncHome();
+    else render();
+  }
+
+  function syncHome() {
+    document.querySelectorAll("#homeLevel button").forEach((b) =>
+      b.classList.toggle("on", b.dataset.level === S.level));
+    $("homeTeach").checked = S.teach;
+    $("homeTier").value = S.tier;
+    $("homeSound").checked = S.sound;
+    $("tierRow").style.display = S.teach ? "flex" : "none";
+    $("resumeBtn").style.display = gameInProgress() ? "block" : "none";
+    renderStats();
+  }
+
+  function setTeach(on) {
+    S.teach = on; S.lastReview = null;
+    if (on && S.phase === "move" && S.dice) S.analysis = Teach.analyze(S.turnStart, S.dice[0], S.dice[1], WHITE);
+    if (!on) S.analysis = null;
+    save();
+    if ($("game").classList.contains("active")) render();
+  }
+
+  function openGameMenu() {
+    showModal("Menu", [
+      { text: "Continue", cls: "primary", on: () => closeModal() },
+      { text: "New game", on: () => { closeModal(); newGame(); } },
+      { text: "End game", on: () => { closeModal(); newGame(); showScreen("home"); } },
+    ]);
+  }
+
   function wire() {
+    // in-game controls
     $("rollBtn").onclick = rollDice;
     $("undoBtn").onclick = undo;
     $("doubleBtn").onclick = humanDouble;
-    $("newBtn").onclick = () => { if (confirm("Start a new game?")) newGame(); };
     $("cube").onclick = humanDouble;
-    $("levelSel").onchange = (e) => { S.level = e.target.value; save(); render(); };
-    $("teachChk").onchange = (e) => { S.teach = e.target.checked; S.lastReview = null;
-      if (S.teach && S.phase === "move") S.analysis = Teach.analyze(S.turnStart, S.dice[0], S.dice[1], WHITE);
-      save(); render(); };
-    $("tierSel").onchange = (e) => { S.tier = e.target.value; save(); render(); };
-    $("soundChk").onchange = (e) => { S.sound = e.target.checked; if (S.sound) sfx.move(); save(); };
+    $("homeBtn").onclick = openGameMenu;
+    $("teachBtn").onclick = () => { setTeach(!S.teach); };
+
+    // home-screen controls
+    document.querySelectorAll("#homeLevel button").forEach((b) => {
+      b.onclick = () => { S.level = b.dataset.level; save(); syncHome(); };
+    });
+    $("homeTeach").onchange = (e) => { setTeach(e.target.checked); syncHome(); };
+    $("homeTier").onchange = (e) => { S.tier = e.target.value; save(); };
+    $("homeSound").onchange = (e) => { S.sound = e.target.checked; if (S.sound) sfx.move(); save(); };
+    $("playBtn").onclick = () => { newGame(); showScreen("game"); };
+    $("resumeBtn").onclick = () => { showScreen("game"); };
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     buildBoard(); wire();
     load();
-    $("levelSel").value = S.level; $("teachChk").checked = S.teach; $("tierSel").value = S.tier;
-    $("soundChk").checked = S.sound;
-    render();
+    showScreen("home");
   });
 })();
