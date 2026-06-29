@@ -37,7 +37,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
     repeating-linear-gradient(90deg, rgba(0,0,0,.05) 0 2px, rgba(255,255,255,.022) 2px 5px),
     linear-gradient(180deg, #6b482a, #46301b); }
 /* fixed-height rows; the board flexes to fill what's left */
-.gamebar, .diceRow, .controls, .teachPanel { flex: 0 0 auto; }
+.gamebar, .controls, .teachPanel { flex: 0 0 auto; }
 
 /* ===== screens ===== */
 .screen { display: none; }
@@ -80,6 +80,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
   background: linear-gradient(180deg, #6a4828, #45301b); color: #f0e2c8; font-size: 17px; line-height: 1; }
 .iconbtn.on { background: linear-gradient(180deg, #c08a3e, #9a6a33); border-color: #caa15a; }
 .iconbtn:active { transform: scale(.95); }
+.gamebar .cube { width: 32px; height: 32px; font-size: 14px; flex: 0 0 auto; }
 
 .topbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .topbar h1 { font-size: 18px; margin: 0; flex: 1; font-weight: 700; }
@@ -94,7 +95,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
 .status .pips { color: var(--muted); white-space: nowrap; }
 
 /* Board */
-#board { border: 9px solid #3a2616; border-radius: 12px;
+#board { border: 9px solid #3a2616; border-radius: 12px; position: relative;
   margin: 2px 0; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
   background:
     linear-gradient(150deg, rgba(255,255,255,.06), rgba(0,0,0,.18)),
@@ -209,8 +210,10 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
 @keyframes landPop { 0% { transform: scale(1.28); } 100% { transform: scale(1); } }
 
 /* Dice + cube row */
-.diceRow { display: flex; align-items: center; gap: 14px; justify-content: center; margin: 2px 0; min-height: 46px; }
-#dice { display: flex; align-items: center; gap: 8px; }
+/* dice are rolled in the centre of the board, as an overlay */
+#dice.dice-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  display: flex; align-items: center; gap: 10px; z-index: 30; pointer-events: none; }
+.dice-overlay .die { box-shadow: 0 4px 8px rgba(0,0,0,.55); }
 .die { width: 42px; height: 42px; background: #f4efe2; border-radius: 8px; display: grid;
   grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 5px; box-shadow: 0 2px 4px rgba(0,0,0,.4);
   transition: opacity .2s, transform .2s; }
@@ -308,6 +311,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
         <button id="homeBtn" class="iconbtn" title="Menu">☰</button>
         <span class="msg" id="msg"></span>
         <span class="pips" id="pips"></span>
+        <div id="cube" class="cube" title="Doubling cube — tap to double">1</div>
         <button id="teachBtn" class="iconbtn" title="Teaching hints">💡</button>
       </div>
 
@@ -324,11 +328,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
           <div class="quadrant" id="q-br"></div>
           <div class="tray" id="tray-bottom"><span class="count">0</span></div>
         </div>
-      </div>
-
-      <div class="diceRow">
-        <div id="cube" class="cube">1</div>
-        <div id="dice"></div>
+        <div id="dice" class="dice-overlay"></div>
       </div>
 
       <div class="controls">
