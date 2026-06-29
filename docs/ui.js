@@ -16,6 +16,42 @@
     analysis: null, lastReview: null,
     cube: 1, cubeOwner: null, // null = center, WHITE/BLACK = owner
     stats: { wins: 0, losses: 0, lossSum: 0, lossN: 0 },
+    animating: false, sound: true,
+  };
+
+  // ---------- sound (synthesized, no asset files) ----------
+  let actx = null;
+  function audio() {
+    if (!S.sound) return null;
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (actx.state === "suspended") actx.resume();
+    return actx;
+  }
+  function tone(freq, dur, type, gain) {
+    const a = audio(); if (!a) return;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.value = 0; o.connect(g); g.connect(a.destination);
+    const t = a.currentTime;
+    g.gain.linearRampToValueAtTime(gain || 0.08, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function noise(dur, gain) {
+    const a = audio(); if (!a) return;
+    const n = Math.floor(a.sampleRate * dur);
+    const buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = a.createBufferSource(); src.buffer = buf;
+    const g = a.createGain(); g.gain.value = gain || 0.05;
+    src.connect(g); g.connect(a.destination); src.start();
+  }
+  const sfx = {
+    dice() { noise(0.18, 0.06); },
+    move() { tone(330, 0.08, "triangle", 0.05); },
+    hit() { tone(150, 0.16, "sawtooth", 0.07); },
+    win() { [523, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 0.25, "sine", 0.08), i * 110)); },
+    lose() { tone(196, 0.4, "sine", 0.06); },
   };
 
   // ---------- persistence ----------
@@ -24,6 +60,7 @@
     try { localStorage.setItem(KEY, JSON.stringify({
       board: S.board, player: S.player, phase: S.phase, level: S.level,
       teach: S.teach, tier: S.tier, cube: S.cube, cubeOwner: S.cubeOwner, stats: S.stats,
+      sound: S.sound,
     })); } catch (e) {}
   }
   function load() {
@@ -32,7 +69,7 @@
       if (!d) return false;
       Object.assign(S, { board: d.board, player: d.player, level: d.level || "medium",
         teach: !!d.teach, tier: d.tier || "intermediate", cube: d.cube || 1,
-        cubeOwner: d.cubeOwner ?? null, stats: d.stats || S.stats });
+        cubeOwner: d.cubeOwner ?? null, stats: d.stats || S.stats, sound: d.sound !== false });
       // Always resume at a clean roll decision for whoever was on move.
       S.phase = E.winner(S.board) ? "over" : "roll";
       return true;
@@ -89,8 +126,8 @@
     $("tray-top").querySelector(".count").textContent = "✓ " + b.offB;
     $("tray-bottom").classList.remove("dst");
 
-    // highlights for current human move
-    if (S.phase === "move" && S.player === WHITE) {
+    // highlights for current human move (suppressed mid-animation)
+    if (S.phase === "move" && S.player === WHITE && !S.animating) {
       const nm = nextMoves();
       if (S.selected === null) {
         const srcs = new Set(nm.map((m) => m.from));
@@ -128,15 +165,20 @@
   function markDest(t) { (t === 0 ? $("tray-bottom") : document.querySelector(`.point[data-point="${t}"]`)).classList.add("dst"); }
 
   const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-  function dieEl(v, used) {
+  function dieEl(v, used, settle) {
     const d = document.createElement("div");
-    d.className = "die" + (used ? " used" : "");
+    d.className = "die" + (used ? " used" : "") + (settle ? " settle" : "");
     for (let i = 0; i < 9; i++) {
       const cell = document.createElement("div");
       if (PIPS[v].includes(i)) { const pip = document.createElement("div"); pip.className = "pip"; cell.appendChild(pip); }
       d.appendChild(cell);
     }
     return d;
+  }
+  // Render an arbitrary pair of faces (used by the tumble animation).
+  function renderDiceFaces(vals, settle) {
+    const row = $("dice"); row.innerHTML = "";
+    vals.forEach((v) => row.appendChild(dieEl(v, false, settle)));
   }
   function renderDice() {
     const row = $("dice"); row.innerHTML = "";
@@ -174,9 +216,10 @@
 
   function renderControls() {
     const over = !!E.winner(S.board);
-    $("rollBtn").disabled = !(S.phase === "roll" && S.player === WHITE && !over);
-    $("undoBtn").disabled = !(S.phase === "move" && S.player === WHITE && S.movesSoFar.length > 0);
-    const canDouble = S.phase === "roll" && S.player === WHITE && !over &&
+    const busy = S.animating;
+    $("rollBtn").disabled = busy || !(S.phase === "roll" && S.player === WHITE && !over);
+    $("undoBtn").disabled = busy || !(S.phase === "move" && S.player === WHITE && S.movesSoFar.length > 0);
+    const canDouble = !busy && S.phase === "roll" && S.player === WHITE && !over &&
       AI.LEVELS[S.level].cube && (S.cubeOwner === null || S.cubeOwner === WHITE);
     $("doubleBtn").disabled = !canDouble;
   }
@@ -196,6 +239,104 @@
       (S.teach ? ` · avg error ${pr} (lower is better)` : "");
   }
 
+  // ---------- animation ----------
+  const rd6 = () => 1 + Math.floor(Math.random() * 6);
+
+  function elementFor(point, player) {
+    if (point === 25) return player === WHITE ? $("bar-bottom") : $("bar-top");
+    if (point === 0) return player === WHITE ? $("tray-bottom") : $("tray-top");
+    return document.querySelector(`.point[data-point="${point}"]`);
+  }
+  // The screen rect of the exposed (top-of-stack) checker at a point.
+  function topCheckerRect(point, player) {
+    const host = elementFor(point, player);
+    if (!host) return null;
+    if (point === 0) return host.getBoundingClientRect();
+    const cs = host.querySelectorAll(".checker");
+    return (cs.length ? cs[cs.length - 1] : host).getBoundingClientRect();
+  }
+
+  // Fly a clone checker from one rect to another, then call done().
+  function flyChecker(from, to, player, done) {
+    if (!from || !to) { done && done(); return; }
+    const size = Math.min(from.width || 24, 30);
+    const f = document.createElement("div");
+    f.className = "checker " + (player === WHITE ? "w" : "b") + " flying";
+    f.style.width = size + "px"; f.style.height = size + "px";
+    f.style.left = from.left + (from.width - size) / 2 + "px";
+    f.style.top = from.top + (from.height ? 0 : 0) + "px";
+    document.body.appendChild(f);
+    f.getBoundingClientRect(); // reflow so the transition runs
+    const dx = (to.left + (to.width - size) / 2) - (from.left + (from.width - size) / 2);
+    const dy = to.top - from.top;
+    f.style.transform = `translate(${dx}px, ${dy}px)`;
+    let done_ = false;
+    const finish = () => { if (done_) return; done_ = true; f.remove(); done && done(); };
+    f.addEventListener("transitionend", finish, { once: true });
+    setTimeout(finish, 340); // fallback if transitionend is missed
+  }
+
+  // Apply one move to the real board, render, and animate the slide.
+  function commitAndAnimate(move, player, done) {
+    const srcRect = topCheckerRect(move.from, player);
+    const willHit = move.to >= 1 && move.to <= 24 && E.count(S.board, move.to, -player) === 1;
+    const hitRect = willHit ? topCheckerRect(move.to, -player) : null;
+
+    S.board = E.applyMove(S.board, move, player);
+    render();
+
+    let arrived = null, dstRect;
+    if (move.to === 0) {
+      dstRect = elementFor(0, player).getBoundingClientRect();
+    } else {
+      const cs = document.querySelectorAll(`.point[data-point="${move.to}"] .checker`);
+      arrived = cs[cs.length - 1] || null;
+      dstRect = arrived ? arrived.getBoundingClientRect() : topCheckerRect(move.to, player);
+      if (arrived) arrived.style.visibility = "hidden"; // hide until the fly lands
+    }
+
+    if (hitRect) {
+      const barRect = elementFor(25, -player).getBoundingClientRect();
+      flyChecker(hitRect, barRect, -player, null);
+      sfx.hit(); vibrate(18);
+    } else { sfx.move(); vibrate(8); }
+
+    flyChecker(srcRect, dstRect, player, () => {
+      if (arrived) {
+        arrived.style.visibility = "visible";
+        arrived.classList.add("land");
+        setTimeout(() => arrived && arrived.classList.remove("land"), 200);
+      }
+      done && done();
+    });
+  }
+
+  // Animate a full play (sequence of moves) one step at a time.
+  function animatePlay(moves, player, done) {
+    let i = 0;
+    (function next() {
+      if (i >= moves.length) { done(); return; }
+      commitAndAnimate(moves[i++], player, () => setTimeout(next, 80));
+    })();
+  }
+
+  // Tumble the dice for ~0.4s, then settle on the real values, then done().
+  function rollDiceAnimated(done) {
+    S.dice = [rd6(), rd6()];
+    sfx.dice(); vibrate(15);
+    const row = $("dice"); row.classList.add("rolling");
+    let ticks = 0;
+    const iv = setInterval(() => {
+      renderDiceFaces([rd6(), rd6()], false);
+      if (++ticks >= 7) {
+        clearInterval(iv);
+        row.classList.remove("rolling");
+        renderDiceFaces([S.dice[0], S.dice[1]], true); // settle pop on real faces
+        done();
+      }
+    }, 55);
+  }
+
   // ---------- consistent-play tracking ----------
   function consistent() {
     return S.plays.filter((p) => p.moves.length >= S.movesSoFar.length &&
@@ -213,7 +354,7 @@
 
   // ---------- human interaction ----------
   function onPointTap(p) {
-    if (S.phase !== "move" || S.player !== WHITE) return;
+    if (S.phase !== "move" || S.player !== WHITE || S.animating) return;
     const nm = nextMoves();
     if (S.selected === null) {
       if (nm.some((m) => m.from === p)) { S.selected = p; render(); }
@@ -227,12 +368,15 @@
   }
 
   function applyHuman(move) {
+    if (S.animating) return;
     S.movesSoFar.push(move);
-    S.board = E.applyMove(S.board, move, WHITE);
     S.selected = null;
-    vibrate(8);
-    if (turnComplete()) finishHumanTurn();
-    else render();
+    S.animating = true;
+    commitAndAnimate(move, WHITE, () => {
+      S.animating = false;
+      if (turnComplete()) finishHumanTurn();
+      else render();
+    });
   }
 
   function finishHumanTurn() {
@@ -250,20 +394,23 @@
   }
 
   function rollDice() {
-    if (S.phase !== "roll" || S.player !== WHITE) return;
-    S.dice = [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
-    vibrate(12);
-    S.plays = E.legalPlays(S.board, S.dice[0], S.dice[1], WHITE);
-    S.movesSoFar = []; S.selected = null; S.turnStart = S.board; S.lastReview = null;
-    S.analysis = S.teach ? Teach.analyze(S.board, S.dice[0], S.dice[1], WHITE) : null;
-    if (S.plays.length === 1 && S.plays[0].moves.length === 0) {
-      // no legal move — forfeit
-      S.phase = "aiturn"; S.player = BLACK; render();
-      $("msg").textContent = "No legal move — you forfeit the turn.";
-      setTimeout(() => { S.dice = null; aiTurn(); }, 1000);
-      return;
-    }
-    S.phase = "move"; render();
+    if (S.phase !== "roll" || S.player !== WHITE || S.animating) return;
+    S.animating = true;
+    renderControls(); // disable buttons during the roll
+    rollDiceAnimated(() => {
+      S.animating = false;
+      S.plays = E.legalPlays(S.board, S.dice[0], S.dice[1], WHITE);
+      S.movesSoFar = []; S.selected = null; S.turnStart = S.board; S.lastReview = null;
+      S.analysis = S.teach ? Teach.analyze(S.board, S.dice[0], S.dice[1], WHITE) : null;
+      if (S.plays.length === 1 && S.plays[0].moves.length === 0) {
+        // no legal move — forfeit
+        S.phase = "aiturn"; S.player = BLACK; render();
+        $("msg").textContent = "No legal move — you forfeit the turn.";
+        setTimeout(() => { S.dice = null; aiTurn(); }, 1100);
+        return;
+      }
+      S.phase = "move"; render();
+    });
   }
 
   function undo() {
@@ -280,14 +427,25 @@
       offerDoubleToHuman();
       return;
     }
-    S.dice = [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
-    render();
-    setTimeout(() => {
-      const play = AI.choosePlay(S.board, S.dice[0], S.dice[1], BLACK, S.level);
-      if (play && play.moves.length) { S.board = play.result; vibrate(6); }
-      if (checkGameOver()) return;
-      S.player = WHITE; S.phase = "roll"; S.dice = null; save(); render();
-    }, 700);
+    S.animating = true;
+    renderStatus();
+    rollDiceAnimated(() => {
+      // choose runs synchronously (tens of ms); let the dice settle first
+      setTimeout(() => {
+        const play = AI.choosePlay(S.board, S.dice[0], S.dice[1], BLACK, S.level);
+        if (!play || !play.moves.length) {
+          S.animating = false;
+          if (checkGameOver()) return;
+          S.player = WHITE; S.phase = "roll"; S.dice = null; save(); render();
+          return;
+        }
+        animatePlay(play.moves, BLACK, () => {
+          S.animating = false;
+          if (checkGameOver()) return;
+          S.player = WHITE; S.phase = "roll"; S.dice = null; save(); render();
+        });
+      }, 180);
+    });
   }
 
   // ---------- cube ----------
@@ -310,14 +468,19 @@
     ]);
   }
   function aiAfterCube() {
-    S.dice = [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
-    render();
-    setTimeout(() => {
-      const play = AI.choosePlay(S.board, S.dice[0], S.dice[1], BLACK, S.level);
-      if (play && play.moves.length) S.board = play.result;
-      if (checkGameOver()) return;
-      S.player = WHITE; S.phase = "roll"; S.dice = null; save(); render();
-    }, 700);
+    S.animating = true;
+    rollDiceAnimated(() => {
+      setTimeout(() => {
+        const play = AI.choosePlay(S.board, S.dice[0], S.dice[1], BLACK, S.level);
+        const finishUp = () => {
+          S.animating = false;
+          if (checkGameOver()) return;
+          S.player = WHITE; S.phase = "roll"; S.dice = null; save(); render();
+        };
+        if (play && play.moves.length) animatePlay(play.moves, BLACK, finishUp);
+        else finishUp();
+      }, 180);
+    });
   }
 
   // ---------- game over ----------
@@ -331,7 +494,8 @@
     const mult = conceded ? 1 : { single: 1, gammon: 2, backgammon: 3 }[E.winType(S.board) || "single"];
     const pts = S.cube * mult;
     if (winnerSide === WHITE) S.stats.wins++; else S.stats.losses++;
-    S.phase = "over"; S.dice = null; save(); render();
+    S.phase = "over"; S.dice = null; S.animating = false; save(); render();
+    if (winnerSide === WHITE) sfx.win(); else sfx.lose();
     const head = winnerSide === WHITE ? "You win! 🎉" : "Opponent wins";
     const detail = conceded ? `Cube conceded · ${pts} point${pts > 1 ? "s" : ""}.`
       : `${label(E.winType(S.board))} × cube ${S.cube} = ${pts} point${pts > 1 ? "s" : ""}.`;
@@ -374,12 +538,14 @@
       if (S.teach && S.phase === "move") S.analysis = Teach.analyze(S.turnStart, S.dice[0], S.dice[1], WHITE);
       save(); render(); };
     $("tierSel").onchange = (e) => { S.tier = e.target.value; save(); render(); };
+    $("soundChk").onchange = (e) => { S.sound = e.target.checked; if (S.sound) sfx.move(); save(); };
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     buildBoard(); wire();
     load();
     $("levelSel").value = S.level; $("teachChk").checked = S.teach; $("tierSel").value = S.tier;
+    $("soundChk").checked = S.sound;
     render();
   });
 })();
